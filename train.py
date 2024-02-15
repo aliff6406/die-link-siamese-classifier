@@ -198,3 +198,6 @@ def train_samsiamese():
     # Plot Loss and Accuracy 
     plot_loss(train_losses, val_losses, artifact_path)
     plot_accuracy(train_accs, val_accs, artifact_path)
+
+if __name__ == "__main__":
+    train_samsiamese()
