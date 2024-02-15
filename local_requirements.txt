@@ -111,7 +111,6 @@ Send2Trash==1.8.2
 six==1.16.0
 sniffio==1.3.0
 soupsieve==2.5
--e git+https://github.com/aliff6406/die_link_classifier.git@55d5be439398be56f81eefadc49f8669239f303a#egg=src
 stack-data==0.6.3
 sympy==1.12
 terminado==0.18.0
