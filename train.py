@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import config
 from samsiamese import SiameseNetworkSAM
 from contrastive import ContrastiveLoss
-from src.data.siamese_pair_dataset import SiamesePairDataset
+from siamese_pair_dataset import SiamesePairDataset
 
 def cur_time():
     fmt = '%Y-%m-%d %H:%M:%S %Z%z'
