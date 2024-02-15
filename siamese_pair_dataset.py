@@ -3,7 +3,6 @@ import random
 
 import numpy as np
 import pandas as pd
-import cv2 as cv
 
 import torch
 from PIL import Image
