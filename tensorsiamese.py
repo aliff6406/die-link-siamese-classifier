@@ -6,10 +6,7 @@ import torch.nn as nn
 from segment_anything import sam_model_registry
 
 class SiameseNetworkSAM(nn.Module):
-    def __init__(self, 
-                 model_type="vit_b",
-                 device=None,
-                 checkpoint=None,
+    def __init__(self,
                  contrastive_loss=None
                  ):
         '''
@@ -23,20 +20,7 @@ class SiameseNetworkSAM(nn.Module):
                     Defaults to None. See https://bit.ly/3VrpxUh for more details.
         '''
         super().__init__()
-        self.model_type = model_type
-        self.device = device
-        self.checkpoint = checkpoint
         self.contrastive_loss = contrastive_loss
-
-        # Use cuda if available
-        if device is None:
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            if device == "cuda":
-                torch.cuda.empty_cache()
-
-        # Build SAM model
-        self.sam = sam_model_registry[self.model_type](checkpoint=self.checkpoint)
-        self.sam.to(device)
 
         # number of features of flattened SAM image encoder output
         out_features = 256 * 64 * 64
@@ -63,13 +47,6 @@ class SiameseNetworkSAM(nn.Module):
             nn.Sigmoid()
         )
 
-    def forward_once(self, img):
-        # Freeze SAM Image Encoder ViT
-        with torch.no_grad():
-            img = self.sam.preprocess(img)
-            output = self.sam.image_encoder(img)
-        return output
-
     def forward(self, img1, img2):
         '''
         Returns the similarity value between two images.
@@ -88,20 +65,17 @@ class SiameseNetworkSAM(nn.Module):
         # The image embeddings returned is a tensor with shape 1xCxHxW where C is
         # the embedding dimension and (H,W) are the embedding spatial dimension of SAM
         # C=256, H=W=64
-        output1 = self.forward_once(img1)
-        output2 = self.forward_once(img2)
         if self.contrastive_loss:
             # Run SAM output through contra_head
-            output1 = self.contra_head(output1)
-            output2 = self.contra_head(output2)
+            output1 = self.contra_head(img1)
+            output2 = self.contra_head(img2)
             return output1, output2
         else:
-            # Flatten the feature vectors into 1D vectors
-            output1 = torch.flatten(output1)
-            output2 = torch.flatten(output2)
+            img1 = torch.flatten(img1)
+            img2 = torch.flatten(img2)
             # Test Euclidean Distance / Cosine Similarity / Absolute Difference / Dot Product
             # Iteration 1: Absolute Difference
-            abs_diff = torch.abs(output1 - output2)
+            abs_diff = torch.abs(img1 - img2)
             # Pass the combined feature vector through classification head to get similarity value in the range of 0 to 1.
             output = self.cls_head(abs_diff)
             return output

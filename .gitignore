@@ -121,3 +121,9 @@ client_secret_986639034005-aet254mkkmut8fu48o6g8brvqlret5fq.apps.googleuserconte
 
 # exclude all .zip files
 **/*.zip
+
+# exclude config.py file
+config.py
+
+# exclude runs 
+runs/*
