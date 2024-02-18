@@ -71,11 +71,11 @@ class SiameseNetworkSAM(nn.Module):
             output2 = self.contra_head(img2)
             return output1, output2
         else:
-            img1 = torch.flatten(img1)
-            img2 = torch.flatten(img2)
+            input1 = torch.flatten(img1)
+            input2 = torch.flatten(img2)
             # Test Euclidean Distance / Cosine Similarity / Absolute Difference / Dot Product
             # Iteration 1: Absolute Difference
-            abs_diff = torch.abs(img1 - img2)
+            abs_diff = torch.abs(input1 - input2)
             # Pass the combined feature vector through classification head to get similarity value in the range of 0 to 1.
             output = self.cls_head(abs_diff)
             return output

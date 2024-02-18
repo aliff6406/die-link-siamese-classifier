@@ -9,6 +9,9 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.utils.data import DataLoader, DistributedSampler
 
 import matplotlib.pyplot as plt
 
@@ -41,13 +44,16 @@ def plot_accuracy(train_accs, val_accs, out_path):
     plt.savefig(os.path.join(out_path, 'accuracy_plot.jpg'))
     plt.close()
 
+def ddp_setup(rank, world_size):
+    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_PORT'] = '12355'
+    dist.init_process_group("nccl", rank=rank, world_size=world_size)
+    torch.cuda.set_device(rank)
 
 def train_samsiamese():
-    # Add ArgumentParser() later on
+    ddp_setup(rank, world_size)
 
-    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    device = 'cuda:1'
-    print("Device: ", device)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # Directory Config
     train_dir = config.obverse_train_dir
     train_csv = config.obverse_train_csv
@@ -70,6 +76,11 @@ def train_samsiamese():
     contra_loss = None
     contra_margin = 1
 
+    sam_transform = transforms.Compose([
+        transforms.PILToTensor(), # Convert to tensor from PIL image
+        transforms.Resize(size=(1024,1024), antialias=False) # Resize to 1024x1024
+    ])
+
     train_dataset = SiameseTensorPairDataset(label_dir=train_csv, tensor_dir=train_dir)
     val_dataset = SiameseTensorPairDataset(label_dir=val_csv, tensor_dir=val_dir)
 
@@ -78,6 +89,10 @@ def train_samsiamese():
     val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
     samsiamese_model = SiameseNetworkSAM(contrastive_loss=contra_loss)
+
+    if torch.cuda.device_count() > 1:
+        samsiamese_model = nn.DataParallel(samsiamese_model)
+
     samsiamese_model.to(device)
 
     # Initialise Loss Function
@@ -108,7 +123,6 @@ def train_samsiamese():
         # Training Loop Start
         for (tensor1, tensor2), label in train_dataloader:
             tensor1, tensor2, label = map(lambda x: x.to(device), [tensor1, tensor2, label])
-
             optimizer.zero_grad()
             if contra_loss:
                 output1, output2 = samsiamese_model(tensor1, tensor2)

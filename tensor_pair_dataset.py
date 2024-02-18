@@ -31,7 +31,7 @@ class SiameseTensorPairDataset(Dataset):
     def __getitem__(self, idx):
         # Construct the path for the first tensor
         tensor_path = os.path.join(self.tensor_dir, self.tensor_df.iloc[idx, 0])
-        tensor = torch.load(tensor_path, map_location=self.device)
+        tensor = torch.load(tensor_path, map_location='cpu')
         label = self.tensor_df.iloc[idx, 1]
 
         # Randomly choose to get a positive or negative pair
@@ -53,7 +53,7 @@ class SiameseTensorPairDataset(Dataset):
 
         # Load the paired tensor
         tensor_pair_path = os.path.join(self.tensor_dir, self.tensor_df.iloc[pair_idx, 0])
-        tensor_pair = torch.load(tensor_pair_path, map_location=self.device)
+        tensor_pair = torch.load(tensor_pair_path, map_location='cpu')
 
         tensor = torch.squeeze(tensor)
         tensor_pair = torch.squeeze(tensor_pair)
