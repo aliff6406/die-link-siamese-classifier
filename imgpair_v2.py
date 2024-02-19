@@ -7,55 +7,6 @@ import pandas as pd
 import torch
 from PIL import Image
 
-# For testing
-import matplotlib.pyplot as plt
-from torch.utils.data import DataLoader
-
-def visualize_dataloader_pairs(dataloader):
-    """
-    Visualizes the first batch of positive and negative image pairs from a DataLoader.
-
-    Parameters:
-    - dataloader: A DataLoader instance wrapping a SiamesePairDataset.
-    """
-    # Get the first batch from the dataloader
-    batch = next(iter(dataloader))
-    
-    # Unpack the batch
-    positive_pairs, positive_labels, negative_pairs, negative_labels = batch
-    
-    # Determine the number of pairs to visualize
-    batch_size = len(positive_labels)
-    
-    # Create a figure with subplots
-    fig, axs = plt.subplots(batch_size, 4, figsize=(20, 5 * batch_size))  # Adjust subplot size as needed
-    
-    for i in range(batch_size):
-        # Images
-        pos_img1, pos_img2 = positive_pairs[i]
-        neg_img1, neg_img2 = negative_pairs[i]
-        
-        # Titles for the subplots
-        titles = ['Positive Pair - Image 1', 'Positive Pair - Image 2', 'Negative Pair - Image 1', 'Negative Pair - Image 2']
-        
-        # Flatten the axis array for easy indexing if in 2D (for batch_size > 1)
-        if batch_size > 1:
-            axs_flat = axs[i].ravel()
-        else:
-            axs_flat = axs.ravel()
-        
-        # Display each image in the pair
-        for j, img in enumerate([pos_img1, pos_img2, neg_img1, neg_img2]):
-            # if img.dim() == 3:  # If the image is a tensor, convert it to a PIL Image for visualization
-                # img = transforms.ToPILImage()(img)
-            axs_flat[j].imshow(img)
-            axs_flat[j].set_title(titles[j])
-            axs_flat[j].axis('off')
-    
-    plt.tight_layout()
-    plt.show()
-# Example usage
-
 class SiamesePairDataset(torch.utils.data.Dataset):
     def __init__(self, label_dir, img_dir, shuffle_pairs=True, transform=None):
         '''
@@ -114,9 +65,3 @@ class SiamesePairDataset(torch.utils.data.Dataset):
         positive_pair = (positive_pair_images[0], positive_pair_images[1])
         negative_pair = (negative_pair_image, different_class_image)
         return (positive_pair, torch.tensor([1], dtype=torch.float32)), (negative_pair, torch.tensor([0], dtype=torch.float32))
-
-if __name__ == "__main__":
-    dataset = SiamesePairDataset(label_dir='./data/ccc_images_final/train/obverse_train_labels.csv', img_dir='./data/ccc_images_final/train/obverses/')
-    dataloader = DataLoader(dataset, batch_size=1, shuffle=True)  # Adjust batch_size as needed
-
-    visualize_dataloader_pairs(dataloader)

@@ -72,7 +72,6 @@ def train_siamese():
     # ViT_b_16 transform
     # transform = ViT_B_16_Weights.DEFAULT.transforms()
     transform = transforms.Compose([
-        transforms.CenterCrop(10),
         transforms.ToTensor(),
     ])
 

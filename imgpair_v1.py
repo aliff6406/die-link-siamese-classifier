@@ -66,5 +66,5 @@ class SiamesePairDataset(torch.utils.data.Dataset):
         class2 = self.image_df.iloc[pair_idx, 1]
 
         # Return the image pair and the label (1 for positive pair, 0 for negative pair)
-        return (image, image_pair), torch.tensor([int(positive_pair)], dtype=torch.float32), (class1, class2)
+        return (image, image_pair), torch.tensor([int(positive_pair)], dtype=torch.float32)
 

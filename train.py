@@ -10,14 +10,17 @@ from torchvision import transforms
 import torch.nn.functional as F
 from torch.optim.lr_scheduler import ExponentialLR
 from torch.utils.tensorboard import SummaryWriter
+from torchvision import transforms
 
 import matplotlib.pyplot as plt
 
 import config
 from tensorsiamese import SiameseNetworkSAM
-from siamese import SiameseNetwork
+# from siamese import SiameseNetwork
 from contrastive import ContrastiveLoss
 from tensorpair_v1 import SiameseTensorPairDataset
+from imgpair_v1 import SiamesePairDataset
+from siamese_example import SiameseNetwork
 
 def cur_time():
     fmt = '%Y-%m-%d %H:%M:%S %Z%z'
@@ -64,16 +67,21 @@ def train_samsiamese():
     os.makedirs(artifact_path)
 
     # Hyperparameters
-    batch_size = 1
+    batch_size = 32
     num_epochs = 20
-    learning_rate = 1e-6
+    learning_rate = 1e-5
 
     # Training Settings - later to be implemented with ArgumentParser()
     contra_loss = None
     contra_margin = 1
 
-    train_dataset = SiameseTensorPairDataset(label_dir=train_csv, tensor_dir=train_dir)
-    val_dataset = SiameseTensorPairDataset(label_dir=val_csv, tensor_dir=val_dir)
+    transform = transforms.Compose([
+        transforms.Resize((128,128)),
+        transforms.ToTensor(),
+    ])
+
+    train_dataset = SiamesePairDataset(label_dir=train_csv, img_dir=train_dir, transform=transform)
+    val_dataset = SiamesePairDataset(label_dir=val_csv, img_dir=val_dir, transform=transform)
 
     # Default batch_size = 1 if not set
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
@@ -98,10 +106,6 @@ def train_samsiamese():
     # Here we use Adam  
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     # scheduler = ExponentialLR(optimizer, gamma=0.9)
-
-    optimizer.zero_grad()
-
-    writer = SummaryWriter(log_dir=artifact_path)
 
     best_val_loss = 100000000
 
@@ -136,7 +140,7 @@ def train_samsiamese():
                 total_pred += len(label)
             else:
                 prob = model(tensor1, tensor2)
-                loss = criterion(prob, label.view(-1))
+                loss = criterion(prob, label)
                 loss.backward()
                 optimizer.step()
 
@@ -150,9 +154,6 @@ def train_samsiamese():
 
         train_losses.append(avg_train_loss)
         train_accs.append(avg_train_acc)
-
-        writer.add_scalar("train_loss", avg_train_loss, epoch+1)
-        writer.add_scalar("train_accuracy", avg_train_acc, epoch+1)
 
         print("Training: Loss={:.2f} | Accuracy={:.2f}".format(sum(train_losses)/len(train_losses), correct_pred / total_pred))
         # Training Loop End
@@ -178,7 +179,7 @@ def train_samsiamese():
             else:
                 with torch.no_grad():
                     prob = model(tensor1, tensor2)
-                    loss = criterion(prob, label.view(-1))
+                    loss = criterion(prob, label)
 
                 losses.append(loss.item())
                 correct_pred += torch.count_nonzero(label == (prob > 0.5)).item()
@@ -189,9 +190,6 @@ def train_samsiamese():
 
         val_losses.append(val_loss)
         val_accs.append(avg_val_acc)
-
-        writer.add_scalar("val_loss", val_loss, epoch+1)
-        writer.add_scalar("val_acc", correct_pred / total_pred, epoch+1)
 
         epoch_end = time.time()
         epoch_time = epoch_end - epoch_start
