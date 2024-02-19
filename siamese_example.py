@@ -29,11 +29,16 @@ class SiameseNetwork(nn.Module):
             nn.Flatten(),
             nn.Linear(131072, 1024),
             nn.ReLU(inplace=True),
-            nn.BatchNorm2d(1024)
+            nn.BatchNorm1d(1024)
         )
 
         self.fc = nn.Sequential(
             nn.Linear(2048, 1),
+            nn.Sigmoid()
+        )
+
+        self.cls_head = nn.Sequential(
+            nn.Linear(1024, 1),
             nn.Sigmoid()
         )
 
@@ -44,6 +49,12 @@ class SiameseNetwork(nn.Module):
     def forward(self, input1, input2):
         output1 = self.forward_once(input1)
         output2 = self.forward_once(input2)
+
+        # Concatenate both feature vectors
         output = torch.cat((output1, output2), 1)
+
+        # Calculate absolute difference between feature vectors
+        # output = abs(output1 - output2)
+
         output = self.fc(output)
         return output

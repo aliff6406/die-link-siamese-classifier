@@ -31,24 +31,23 @@ class SiameseNetwork(nn.Module):
         # Create an MLP (multi-layer perceptron) as the classification head. 
         # Classifies if provided combined feature vector of the 2 images represent same player or different.
         self.cls_head = nn.Sequential(
-            nn.Dropout(p=0.5),
-            nn.Linear(768, 512),
-            nn.BatchNorm1d(512),
-            nn.ReLU(),
+            # nn.Dropout(p=0.5),
+            # nn.Linear(768, 512),
+            # nn.BatchNorm1d(768),
+            # nn.ReLU(),
 
-            nn.Dropout(p=0.5),
-            nn.Linear(512, 64),
-            nn.BatchNorm1d(64),
-            nn.Sigmoid(),
-            nn.Dropout(p=0.5),
+            # nn.Dropout(p=0.5),
+            nn.Linear(768, 1),
+            # nn.BatchNorm1d(64),
+            # nn.Sigmoid(),
+            # nn.Dropout(p=0.5),
 
-            nn.Linear(64, 1),
             nn.Sigmoid(),
         )
 
     def forward_once(self, img):
         preprocess = ViT_B_16_Weights.DEFAULT.transforms()
-        img = preprocess(img)
+        # img = preprocess(img)
 
         
         feats = self.vit._process_input(img)
@@ -81,9 +80,10 @@ class SiameseNetwork(nn.Module):
         feat1 = self.forward_once(img1)
         feat2 = self.forward_once(img2)
 
-        # Multiply (element-wise) the feature vectors of the two images together, 
-        # to generate a combined feature vector representing the similarity between the two.
+        # Calculate absolute difference between feature vectors
         abs_diff = (feat1 - feat2)
+
+        # output = torch.cat((feat1, feat2), 1)
 
         # Pass the combined feature vector through classification head to get similarity value in the range of 0 to 1.
         output = self.cls_head(abs_diff)

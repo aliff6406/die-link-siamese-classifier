@@ -8,6 +8,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import ExponentialLR
 from torchvision import transforms
+from torchvision.models import ViT_B_16_Weights
 
 import matplotlib.pyplot as plt
 
@@ -61,19 +62,19 @@ def train_siamese():
     os.makedirs(artifact_path)
 
     # Hyperparameters
-    batch_size = 64
+    batch_size = 32
     num_epochs = 20
-    learning_rate = 1e-6
+    learning_rate = 0.005
 
     # Training Settings - later to be implemented with ArgumentParser()
     contra_loss = None
     contra_margin = 1
 
     # ViT_b_16 transform
-    # transform = ViT_B_16_Weights.DEFAULT.transforms()
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-    ])
+    transform = ViT_B_16_Weights.DEFAULT.transforms()
+    # transform = transforms.Compose([
+    #     transforms.ToTensor(),
+    # ])
 
     train_dataset = SiamesePairDataset(label_dir=train_csv, img_dir=train_dir, transform=transform)
     val_dataset = SiamesePairDataset(label_dir=val_csv, img_dir=val_dir, transform=transform)
@@ -97,9 +98,11 @@ def train_siamese():
     else:
         criterion = nn.BCELoss()
 
+    print(model.parameters())
     # Initialise Optimizer - can experiment with different optimizers
     # Here we use Adam  
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=2, factor=0.1, verbose=True)
     # scheduler = ExponentialLR(optimizer, gamma=0.9)
 
     optimizer.zero_grad()
@@ -192,6 +195,8 @@ def train_siamese():
 
         epoch_end = time.time()
         epoch_time = epoch_end - epoch_start
+
+        scheduler.step(val_loss)
 
         print("Validation: Loss={:.2f} | Accuracy={:.2f} | Time={:.2f}".format(val_loss, correct_pred / total_pred, epoch_time))
         # Validation Loop End

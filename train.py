@@ -10,7 +10,7 @@ from torchvision import transforms
 import torch.nn.functional as F
 from torch.optim.lr_scheduler import ExponentialLR
 from torch.utils.tensorboard import SummaryWriter
-from torchvision import transforms
+from torchvision import transforms, datasets
 
 import matplotlib.pyplot as plt
 
@@ -20,7 +20,9 @@ from tensorsiamese import SiameseNetworkSAM
 from contrastive import ContrastiveLoss
 from tensorpair_v1 import SiameseTensorPairDataset
 from imgpair_v1 import SiamesePairDataset
-from siamese_example import SiameseNetwork
+from siamese import SiameseNetwork
+
+from torchvision.models import ViT_B_16_Weights
 
 def cur_time():
     fmt = '%Y-%m-%d %H:%M:%S %Z%z'
@@ -68,22 +70,22 @@ def train_samsiamese():
 
     # Hyperparameters
     batch_size = 32
-    num_epochs = 20
-    learning_rate = 1e-5
+    num_epochs = 100
+    learning_rate = 1e-3
 
     # Training Settings - later to be implemented with ArgumentParser()
-    contra_loss = None
     contra_margin = 1
 
-    transform = transforms.Compose([
-        transforms.Resize((128,128)),
-        transforms.ToTensor(),
-    ])
+    transform = ViT_B_16_Weights.DEFAULT.transforms()
+    # transform = transforms.Compose([
+    #     transforms.Resize((128,128)),
+    #     transforms.ToTensor(),
+    # ])
 
     train_dataset = SiamesePairDataset(label_dir=train_csv, img_dir=train_dir, transform=transform)
     val_dataset = SiamesePairDataset(label_dir=val_csv, img_dir=val_dir, transform=transform)
 
-    # Default batch_size = 1 if not set
+    # # Default batch_size = 1 if not set
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
@@ -97,14 +99,12 @@ def train_samsiamese():
     model.to(device)
 
     # Initialise Loss Function
-    if contra_loss:
-        criterion = ContrastiveLoss(margin=contra_margin)
-    else:
-        criterion = nn.BCELoss()
+    criterion = nn.BCELoss()
 
     # Initialise Optimizer - can experiment with different optimizers
     # Here we use Adam  
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=5e-4)
+    # optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9)
     # scheduler = ExponentialLR(optimizer, gamma=0.9)
 
     best_val_loss = 100000000
@@ -129,24 +129,13 @@ def train_samsiamese():
             tensor1, tensor2, label = map(lambda x: x.to(device), [tensor1, tensor2, label])
 
             optimizer.zero_grad()
-            if contra_loss:
-                output1, output2 = model(tensor1, tensor2)
-                loss = criterion(output1, output2, label)
-                loss.backward()
-                optimizer.step()
-
-                losses.append(loss.item())
-                correct_pred += torch.count_nonzero(label == (F.pairwise_distance(output1, output2) < contra_margin)).item()
-                total_pred += len(label)
-            else:
-                prob = model(tensor1, tensor2)
-                loss = criterion(prob, label)
-                loss.backward()
-                optimizer.step()
-
-                losses.append(loss.item())
-                correct_pred += torch.count_nonzero(label == (prob > 0.5)).item()
-                total_pred += len(label)
+            prob = model(tensor1, tensor2)
+            loss = criterion(prob, label)
+            loss.backward()
+            optimizer.step()
+            losses.append(loss.item())
+            correct_pred += torch.count_nonzero(label == (prob > 0.5)).sum().item()
+            total_pred += len(label)
 
         # scheduler.step()
         avg_train_loss = sum(losses) / len(losses)
@@ -169,21 +158,13 @@ def train_samsiamese():
         for (tensor1, tensor2), label in val_dataloader:
             tensor1, tensor2, label = map(lambda x: x.to(device), [tensor1, tensor2, label])
 
-            if contra_loss:
-                output1, output2 = model(tensor1, tensor2)
-                loss = criterion(output1, output2, label)
+            with torch.no_grad():
+                prob = model(tensor1, tensor2)
+                loss = criterion(prob, label)
 
-                losses.append(loss.item())
-                correct_pred += torch.count_nonzero(label == (F.pairwise_distance(output1, output2) < contra_margin)).item()
-                total_pred += len(label)
-            else:
-                with torch.no_grad():
-                    prob = model(tensor1, tensor2)
-                    loss = criterion(prob, label)
-
-                losses.append(loss.item())
-                correct_pred += torch.count_nonzero(label == (prob > 0.5)).item()
-                total_pred += len(label)
+            losses.append(loss.item())
+            correct_pred += torch.count_nonzero(label == (prob > 0.5)).item()
+            total_pred += len(label)
             
         val_loss = sum(losses) / max(1, len(losses))
         avg_val_acc = correct_pred / total_pred
