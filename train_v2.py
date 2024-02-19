@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import ExponentialLR
-from torchvision.models import ViT_B_16_Weights
+from torchvision import transforms
 
 import matplotlib.pyplot as plt
 
@@ -61,19 +61,23 @@ def train_siamese():
     os.makedirs(artifact_path)
 
     # Hyperparameters
-    batch_size = 1
+    batch_size = 64
     num_epochs = 20
-    learning_rate = 1e-5
+    learning_rate = 1e-6
 
     # Training Settings - later to be implemented with ArgumentParser()
     contra_loss = None
     contra_margin = 1
 
     # ViT_b_16 transform
-    transform = ViT_B_16_Weights.DEFAULT.transforms()
+    # transform = ViT_B_16_Weights.DEFAULT.transforms()
+    transform = transforms.Compose([
+        transforms.CenterCrop(10),
+        transforms.ToTensor(),
+    ])
 
-    train_dataset = SiamesePairDataset(label_dir=train_csv, tensor_dir=train_dir, transform=transform)
-    val_dataset = SiamesePairDataset(label_dir=val_csv, tensor_dir=val_dir, transform=transform)
+    train_dataset = SiamesePairDataset(label_dir=train_csv, img_dir=train_dir, transform=transform)
+    val_dataset = SiamesePairDataset(label_dir=val_csv, img_dir=val_dir, transform=transform)
 
     # Default batch_size = 1 if not set
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
@@ -177,8 +181,6 @@ def train_siamese():
                 optimizer.zero_grad()  # Clear gradients before processing the negative pairs
                 neg_prob = model(neg1, neg2)
                 neg_loss = criterion(neg_prob, neg_label)
-                neg_loss.backward()  # Backpropagate loss for negative pairs
-                optimizer.step()  # Update model parameters based on negative pairs
                 losses.append(neg_loss.item())
                 correct_pred += torch.count_nonzero(neg_label == (neg_prob > 0.5)).item()
                 total_pred += len(neg_label)

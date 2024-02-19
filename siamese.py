@@ -33,12 +33,12 @@ class SiameseNetwork(nn.Module):
         self.cls_head = nn.Sequential(
             nn.Dropout(p=0.5),
             nn.Linear(768, 512),
-            # nn.BatchNorm1d(512),
+            nn.BatchNorm1d(512),
             nn.ReLU(),
 
             nn.Dropout(p=0.5),
             nn.Linear(512, 64),
-            # nn.BatchNorm1d(64),
+            nn.BatchNorm1d(64),
             nn.Sigmoid(),
             nn.Dropout(p=0.5),
 
@@ -47,6 +47,10 @@ class SiameseNetwork(nn.Module):
         )
 
     def forward_once(self, img):
+        preprocess = ViT_B_16_Weights.DEFAULT.transforms()
+        img = preprocess(img)
+
+        
         feats = self.vit._process_input(img)
 
         # Expand the class token to the full batch
@@ -57,7 +61,6 @@ class SiameseNetwork(nn.Module):
 
         # We're only interested in the representation of the classifier token that we appended at position 0
         feats = feats[:, 0]
-        print(feats.shape)
         return feats
 
     def forward(self, img1, img2):
@@ -78,9 +81,6 @@ class SiameseNetwork(nn.Module):
         feat1 = self.forward_once(img1)
         feat2 = self.forward_once(img2)
 
-        print("feat1 shape: ", feat1.shape)
-        print("feat2 shape: ", feat2.shape)
-        
         # Multiply (element-wise) the feature vectors of the two images together, 
         # to generate a combined feature vector representing the similarity between the two.
         abs_diff = (feat1 - feat2)
