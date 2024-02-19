@@ -2,6 +2,7 @@ import os
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from segment_anything import sam_model_registry
 
@@ -25,27 +26,26 @@ class SiameseNetworkSAM(nn.Module):
         # number of features of flattened SAM image encoder output
         out_features = 256 * 64 * 64
 
-        self.contra_head = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(out_features, 1024),
-            nn.ReLU(inplace=True)
-        )
-
         # Create an MLP (multi-layer perceptron) as the classification head. 
         # Classifies if inputted similarity
         self.cls_head = nn.Sequential(
+            # nn.Dropout(p=0.25),
             nn.Linear(out_features, 1024),
-            # nn.Dropout(p=0.5),
             
             nn.Linear(1024, 512),
-            nn.ReLU(),
+            nn.ReLU(inplace=True),
 
-            # nn.Dropout(p=0.5),
-            nn.Linear(512, 64),
+            # nn.Linear(512, 64),
 
-            nn.Linear(64,1),
+            # nn.Linear(64,1),
+            nn.Linear(512,1),
+            # nn.Dropout(p=0.25),
             nn.Sigmoid()
         )
+
+    def forward_once(self, img1):
+        output = self.sam_head(img1)
+        return output
 
     def forward(self, img1, img2):
         '''
@@ -71,11 +71,12 @@ class SiameseNetworkSAM(nn.Module):
             output2 = self.contra_head(img2)
             return output1, output2
         else:
-            input1 = torch.flatten(img1)
-            input2 = torch.flatten(img2)
+            output1 = torch.flatten(img1)
+            output2 = torch.flatten(img2)
             # Test Euclidean Distance / Cosine Similarity / Absolute Difference / Dot Product
             # Iteration 1: Absolute Difference
-            abs_diff = torch.abs(input1 - input2)
+            abs_diff = torch.abs(output1 - output2)
+            # euc_dist = F.pairwise_distance(input1, input2, keepdim=True)
             # Pass the combined feature vector through classification head to get similarity value in the range of 0 to 1.
             output = self.cls_head(abs_diff)
             return output

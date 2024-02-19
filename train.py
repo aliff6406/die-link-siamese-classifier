@@ -8,6 +8,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from torchvision import transforms
 import torch.nn.functional as F
+from torch.optim.lr_scheduler import ExponentialLR
 from torch.utils.tensorboard import SummaryWriter
 
 import matplotlib.pyplot as plt
@@ -46,7 +47,7 @@ def train_samsiamese():
     # Add ArgumentParser() later on
 
     # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    device = 'cuda:1'
+    device = 'cuda:7'
     print("Device: ", device)
     # Directory Config
     train_dir = config.obverse_train_dir
@@ -63,8 +64,8 @@ def train_samsiamese():
 
     # Hyperparameters
     batch_size = 1
-    num_epochs = 100
-    learning_rate = 0.001
+    num_epochs = 20
+    learning_rate = 1e-6
 
     # Training Settings - later to be implemented with ArgumentParser()
     contra_loss = None
@@ -89,10 +90,18 @@ def train_samsiamese():
     # Initialise Optimizer - can experiment with different optimizers
     # Here we use Adam  
     optimizer = torch.optim.Adam(samsiamese_model.parameters(), lr=learning_rate)
+    # scheduler = ExponentialLR(optimizer, gamma=0.9)
+
+    optimizer.zero_grad()
 
     writer = SummaryWriter(log_dir=artifact_path)
 
     best_val_loss = 100000000
+
+    train_losses = []
+    train_accs = []
+    val_losses = []
+    val_accs = []
 
     for epoch in range(num_epochs):
         print("Epoch [{} / {}]".format(epoch+1, num_epochs))
@@ -100,20 +109,19 @@ def train_samsiamese():
         samsiamese_model.train()
 
         losses = []
-        train_losses = []
-        train_accs = []
+        
         correct_pred = 0
         total_pred = 0
 
         # Training Loop Start
-        for (tensor1, tensor2), label in train_dataloader:
+        for i, ((tensor1, tensor2), label) in enumerate(train_dataloader):
             tensor1, tensor2, label = map(lambda x: x.to(device), [tensor1, tensor2, label])
 
             optimizer.zero_grad()
             if contra_loss:
                 output1, output2 = samsiamese_model(tensor1, tensor2)
                 loss = criterion(output1, output2, label)
-                loss.backwards()
+                loss.backward()
                 optimizer.step()
 
                 losses.append(loss.item())
@@ -129,6 +137,7 @@ def train_samsiamese():
                 correct_pred += torch.count_nonzero(label == (prob > 0.5)).item()
                 total_pred += len(label)
 
+        # scheduler.step()
         avg_train_loss = sum(losses) / len(losses)
         avg_train_acc = correct_pred / total_pred
 
@@ -138,15 +147,14 @@ def train_samsiamese():
         writer.add_scalar("train_loss", avg_train_loss, epoch+1)
         writer.add_scalar("train_accuracy", avg_train_acc, epoch+1)
 
-        print("Epoch [{} / {}] | Training: Loss={:.2f} | Accuracy={:.2f}".format(epoch+1, num_epochs, sum(train_losses)/len(train_losses), correct_pred / total_pred))
+        print("Training: Loss={:.2f} | Accuracy={:.2f}".format(sum(train_losses)/len(train_losses), correct_pred / total_pred))
         # Training Loop End
 
         # Validation Loop Start
         samsiamese_model.eval()
 
         losses = []
-        val_losses = []
-        val_accs = []
+        
         correct_pred = 0
         total_pred = 0
 
@@ -161,8 +169,9 @@ def train_samsiamese():
                 correct_pred += torch.count_nonzero(label == (F.pairwise_distance(output1, output2) < contra_margin)).item()
                 total_pred += len(label)
             else:
-                prob = samsiamese_model(tensor1, tensor2)
-                loss = criterion(prob, label.view(-1))
+                with torch.no_grad():
+                    prob = samsiamese_model(tensor1, tensor2)
+                    loss = criterion(prob, label.view(-1))
 
                 losses.append(loss.item())
                 correct_pred += torch.count_nonzero(label == (prob > 0.5)).item()
@@ -180,7 +189,7 @@ def train_samsiamese():
         epoch_end = time.time()
         epoch_time = epoch_end - epoch_start
 
-        print("Epoch [{} / {}]: Time={:.2f} | Validation: Loss={:.2f} | Accuracy={:.2f}".format(epoch+1, num_epochs, epoch_time, val_loss, correct_pred / total_pred))
+        print("Validation: Loss={:.2f} | Accuracy={:.2f} | Time={:.2f}".format(val_loss, correct_pred / total_pred, epoch_time))
         # Validation Loop End
 
         # Update "best.pt" model if val_loss of current epoch is lower than the best validation loss
@@ -189,15 +198,14 @@ def train_samsiamese():
             torch.save(
                 {
                     "epoch": epoch + 1,
-                    "model_state_dict": samsiamese_model.state_dict(),
-                    "optimizer_state_dict": optimizer.state_dict()
+                    "model_state_dict": samsiamese_model.state_dict()
                 },
                 os.path.join(artifact_path, "best.pt")
             )
-    
-    # Plot Loss and Accuracy 
-    plot_loss(train_losses, val_losses, artifact_path)
-    plot_accuracy(train_accs, val_accs, artifact_path)
+
+        # Plot Loss and Accuracy 
+        plot_loss(train_losses, val_losses, artifact_path)
+        plot_accuracy(train_accs, val_accs, artifact_path)
 
 if __name__ == "__main__":
     train_samsiamese()
