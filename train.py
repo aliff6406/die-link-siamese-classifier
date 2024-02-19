@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 
 import config
 from tensorsiamese import SiameseNetworkSAM
+from siamese import SiameseNetwork
 from contrastive import ContrastiveLoss
 from tensor_pair_dataset import SiameseTensorPairDataset
 
@@ -78,8 +79,14 @@ def train_samsiamese():
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
-    samsiamese_model = SiameseNetworkSAM(contrastive_loss=contra_loss)
-    samsiamese_model.to(device)
+    # Model for pre-computed SAM feature vectors
+    # model = SiameseNetworkSAM(contrastive_loss=contra_loss)
+    # model.to(device)
+
+    # Pretrained Torch models
+    # This iteration - vit_b_16 trained on ImageNet1k
+    model = SiameseNetwork()
+    model.to(device)
 
     # Initialise Loss Function
     if contra_loss:
@@ -89,7 +96,7 @@ def train_samsiamese():
 
     # Initialise Optimizer - can experiment with different optimizers
     # Here we use Adam  
-    optimizer = torch.optim.Adam(samsiamese_model.parameters(), lr=learning_rate)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     # scheduler = ExponentialLR(optimizer, gamma=0.9)
 
     optimizer.zero_grad()
@@ -106,7 +113,7 @@ def train_samsiamese():
     for epoch in range(num_epochs):
         print("Epoch [{} / {}]".format(epoch+1, num_epochs))
         epoch_start = time.time()
-        samsiamese_model.train()
+        model.train()
 
         losses = []
         
@@ -119,7 +126,7 @@ def train_samsiamese():
 
             optimizer.zero_grad()
             if contra_loss:
-                output1, output2 = samsiamese_model(tensor1, tensor2)
+                output1, output2 = model(tensor1, tensor2)
                 loss = criterion(output1, output2, label)
                 loss.backward()
                 optimizer.step()
@@ -128,7 +135,7 @@ def train_samsiamese():
                 correct_pred += torch.count_nonzero(label == (F.pairwise_distance(output1, output2) < contra_margin)).item()
                 total_pred += len(label)
             else:
-                prob = samsiamese_model(tensor1, tensor2)
+                prob = model(tensor1, tensor2)
                 loss = criterion(prob, label.view(-1))
                 loss.backward()
                 optimizer.step()
@@ -151,7 +158,7 @@ def train_samsiamese():
         # Training Loop End
 
         # Validation Loop Start
-        samsiamese_model.eval()
+        model.eval()
 
         losses = []
         
@@ -162,7 +169,7 @@ def train_samsiamese():
             tensor1, tensor2, label = map(lambda x: x.to(device), [tensor1, tensor2, label])
 
             if contra_loss:
-                output1, output2 = samsiamese_model(tensor1, tensor2)
+                output1, output2 = model(tensor1, tensor2)
                 loss = criterion(output1, output2, label)
 
                 losses.append(loss.item())
@@ -170,7 +177,7 @@ def train_samsiamese():
                 total_pred += len(label)
             else:
                 with torch.no_grad():
-                    prob = samsiamese_model(tensor1, tensor2)
+                    prob = model(tensor1, tensor2)
                     loss = criterion(prob, label.view(-1))
 
                 losses.append(loss.item())
@@ -198,7 +205,7 @@ def train_samsiamese():
             torch.save(
                 {
                     "epoch": epoch + 1,
-                    "model_state_dict": samsiamese_model.state_dict()
+                    "model_state_dict": model.state_dict()
                 },
                 os.path.join(artifact_path, "best.pt")
             )

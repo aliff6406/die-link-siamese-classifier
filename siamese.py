@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from torchvision import models
 
 class SiameseNetwork(nn.Module):
-    def __init__(self, backbone="resnet18"):
+    def __init__(self, backbone="vit_b_16"):
         '''
         Creates a siamese network with a network from torchvision.models as backbone.
 
