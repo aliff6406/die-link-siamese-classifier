@@ -13,7 +13,7 @@ from torch.utils.data import Dataset
 from torch.utils.data.distributed import DistributedSampler
 import torch.multiprocessing as mp
 
-from tensor_pair_dataset import SiameseTensorPairDataset
+from tensorpair_v1 import SiameseTensorPairDataset
 from contrastive import ContrastiveLoss
 from tensorsiamese import SiameseNetworkSAM
 

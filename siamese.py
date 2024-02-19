@@ -4,6 +4,10 @@ import torch.nn.functional as F
 
 from torchvision import models
 
+from torchvision.models.vision_transformer import vit_b_16
+from torchvision.models import ViT_B_16_Weights
+
+
 class SiameseNetwork(nn.Module):
     def __init__(self, backbone="vit_b_16"):
         '''
@@ -19,28 +23,42 @@ class SiameseNetwork(nn.Module):
             raise Exception("No model named {} exists in torchvision.models.".format(backbone))
 
         # Create a backbone network from the pretrained models provided in torchvision.models 
-        self.backbone = models.__dict__[backbone](pretrained=True, progress=True)
+        self.vit = vit_b_16(weights=ViT_B_16_Weights.DEFAULT)
+
 
         # Get the number of features that are outputted by the last layer of backbone network.
-        out_features = list(self.backbone.modules())[-1].out_features
 
         # Create an MLP (multi-layer perceptron) as the classification head. 
         # Classifies if provided combined feature vector of the 2 images represent same player or different.
         self.cls_head = nn.Sequential(
             nn.Dropout(p=0.5),
-            nn.Linear(out_features, 512),
-            nn.BatchNorm1d(512),
+            nn.Linear(768, 512),
+            # nn.BatchNorm1d(512),
             nn.ReLU(),
 
             nn.Dropout(p=0.5),
             nn.Linear(512, 64),
-            nn.BatchNorm1d(64),
+            # nn.BatchNorm1d(64),
             nn.Sigmoid(),
             nn.Dropout(p=0.5),
 
             nn.Linear(64, 1),
             nn.Sigmoid(),
         )
+
+    def forward_once(self, img):
+        feats = self.vit._process_input(img)
+
+        # Expand the class token to the full batch
+        batch_class_token = self.vit.class_token.expand(img.shape[0], -1, -1)
+        feats = torch.cat([batch_class_token, feats], dim=1)
+
+        feats = self.vit.encoder(feats)
+
+        # We're only interested in the representation of the classifier token that we appended at position 0
+        feats = feats[:, 0]
+        print(feats.shape)
+        return feats
 
     def forward(self, img1, img2):
         '''
@@ -57,8 +75,11 @@ class SiameseNetwork(nn.Module):
         '''
 
         # Pass the both images through the backbone network to get their seperate feature vectors
-        feat1 = self.backbone(img1)
-        feat2 = self.backbone(img2)
+        feat1 = self.forward_once(img1)
+        feat2 = self.forward_once(img2)
+
+        print("feat1 shape: ", feat1.shape)
+        print("feat2 shape: ", feat2.shape)
         
         # Multiply (element-wise) the feature vectors of the two images together, 
         # to generate a combined feature vector representing the similarity between the two.
@@ -67,3 +88,7 @@ class SiameseNetwork(nn.Module):
         # Pass the combined feature vector through classification head to get similarity value in the range of 0 to 1.
         output = self.cls_head(abs_diff)
         return output
+    
+# testing
+if __name__ == "__main__":
+    SiameseNetwork()

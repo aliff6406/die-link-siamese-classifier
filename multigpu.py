@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 import config
 from tensorsiamese import SiameseNetworkSAM
 from contrastive import ContrastiveLoss
-from tensor_pair_dataset import SiameseTensorPairDataset
+from tensorpair_v1 import SiameseTensorPairDataset
 
 def cur_time():
     fmt = '%Y-%m-%d %H:%M:%S %Z%z'
