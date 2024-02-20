@@ -25,6 +25,9 @@ class SiameseNetwork(nn.Module):
         # Create a backbone network from the pretrained models provided in torchvision.models 
         self.vit = vit_b_16(weights=ViT_B_16_Weights.DEFAULT)
 
+        for params in self.vit.parameters():
+            params.requires_grad = False
+
 
         # Get the number of features that are outputted by the last layer of backbone network.
 
@@ -32,12 +35,12 @@ class SiameseNetwork(nn.Module):
         # Classifies if provided combined feature vector of the 2 images represent same player or different.
         self.cls_head = nn.Sequential(
             # nn.Dropout(p=0.5),
-            # nn.Linear(768, 512),
+            nn.Linear(768, 512),
             # nn.BatchNorm1d(768),
-            # nn.ReLU(),
+            nn.ReLU(),
 
             # nn.Dropout(p=0.5),
-            nn.Linear(768, 1),
+            nn.Linear(512, 1),
             # nn.BatchNorm1d(64),
             # nn.Sigmoid(),
             # nn.Dropout(p=0.5),
@@ -46,10 +49,8 @@ class SiameseNetwork(nn.Module):
         )
 
     def forward_once(self, img):
-        preprocess = ViT_B_16_Weights.DEFAULT.transforms()
+        # preprocess = ViT_B_16_Weights.DEFAULT.transforms()
         # img = preprocess(img)
-
-        
         feats = self.vit._process_input(img)
 
         # Expand the class token to the full batch

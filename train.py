@@ -8,7 +8,6 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from torchvision import transforms
 import torch.nn.functional as F
-from torch.optim.lr_scheduler import ExponentialLR
 from torch.utils.tensorboard import SummaryWriter
 from torchvision import transforms, datasets
 
@@ -16,11 +15,11 @@ import matplotlib.pyplot as plt
 
 import config
 from tensorsiamese import SiameseNetworkSAM
-# from siamese import SiameseNetwork
 from contrastive import ContrastiveLoss
 from tensorpair_v1 import SiameseTensorPairDataset
 from imgpair_v1 import SiamesePairDataset
 from siamese import SiameseNetwork
+# from siamese_example import SiameseNetwork
 
 from torchvision.models import ViT_B_16_Weights
 
@@ -53,7 +52,7 @@ def train_samsiamese():
     # Add ArgumentParser() later on
 
     # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    device = 'cuda:7'
+    device = 'mps'
     print("Device: ", device)
     # Directory Config
     train_dir = config.obverse_train_dir
@@ -61,7 +60,7 @@ def train_samsiamese():
     val_dir = config.obverse_validate_dir
     val_csv = config.obverse_validate_csv
 
-    runs_dir = config.output_path
+    runs_dir = './runs/'
 
     # Create Directory to Store Experiment Artifacts
     artifact_dir_name = cur_time()
@@ -69,24 +68,24 @@ def train_samsiamese():
     os.makedirs(artifact_path)
 
     # Hyperparameters
-    batch_size = 32
+    batch_size = 1
     num_epochs = 100
-    learning_rate = 1e-3
+    learning_rate = 1e-4
 
     # Training Settings - later to be implemented with ArgumentParser()
     contra_margin = 1
 
     transform = ViT_B_16_Weights.DEFAULT.transforms()
     # transform = transforms.Compose([
-    #     transforms.Resize((128,128)),
+    #     transforms.Resize((512,512)),
     #     transforms.ToTensor(),
     # ])
 
-    train_dataset = SiamesePairDataset(label_dir=train_csv, img_dir=train_dir, transform=transform)
-    val_dataset = SiamesePairDataset(label_dir=val_csv, img_dir=val_dir, transform=transform)
+    train_dataset = SiamesePairDataset(label_dir='data/train/train_labels.csv', img_dir='data/train/', transform=transform)
+    val_dataset = SiamesePairDataset(label_dir='data/val1/train_labels.csv', img_dir='data/val1/', transform=transform)
 
     # # Default batch_size = 1 if not set
-    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
     val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
     # Model for pre-computed SAM feature vectors
@@ -99,16 +98,19 @@ def train_samsiamese():
     model.to(device)
 
     # Initialise Loss Function
+    # criterion = nn.BCELoss()
     criterion = nn.BCELoss()
 
     # Initialise Optimizer - can experiment with different optimizers
     # Here we use Adam  
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=5e-4)
-    # optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
     # scheduler = ExponentialLR(optimizer, gamma=0.9)
 
     best_val_loss = 100000000
 
+    epoch_train_losses = []
+    epoch_val_losses = []
     train_losses = []
     train_accs = []
     val_losses = []
@@ -127,6 +129,7 @@ def train_samsiamese():
         # Training Loop Start
         for i, ((tensor1, tensor2), label) in enumerate(train_dataloader):
             tensor1, tensor2, label = map(lambda x: x.to(device), [tensor1, tensor2, label])
+            label = label.float()
 
             optimizer.zero_grad()
             prob = model(tensor1, tensor2)
@@ -134,30 +137,33 @@ def train_samsiamese():
             loss.backward()
             optimizer.step()
             losses.append(loss.item())
-            correct_pred += torch.count_nonzero(label == (prob > 0.5)).sum().item()
+            correct_pred += torch.count_nonzero(label == (prob > 0.5)).item()
             total_pred += len(label)
 
         # scheduler.step()
         avg_train_loss = sum(losses) / len(losses)
-        avg_train_acc = correct_pred / total_pred
+        epoch_train_acc = correct_pred / total_pred
 
         train_losses.append(avg_train_loss)
-        train_accs.append(avg_train_acc)
+        epoch_train_loss = sum(train_losses)/len(train_losses)
+        epoch_train_losses.append(epoch_train_loss)
+        train_accs.append(epoch_train_acc)
 
-        print("Training: Loss={:.2f} | Accuracy={:.2f}".format(sum(train_losses)/len(train_losses), correct_pred / total_pred))
+        print("Training: Loss={:.2f} | Accuracy={:.2f}".format(epoch_train_loss, epoch_train_acc))
         # Training Loop End
 
         # Validation Loop Start
         model.eval()
 
         losses = []
+        accs = []
         
         correct_pred = 0
         total_pred = 0
 
         for (tensor1, tensor2), label in val_dataloader:
             tensor1, tensor2, label = map(lambda x: x.to(device), [tensor1, tensor2, label])
-
+            label = label.float()
             with torch.no_grad():
                 prob = model(tensor1, tensor2)
                 loss = criterion(prob, label)
@@ -167,15 +173,18 @@ def train_samsiamese():
             total_pred += len(label)
             
         val_loss = sum(losses) / max(1, len(losses))
-        avg_val_acc = correct_pred / total_pred
+        epoch_val_acc = correct_pred / total_pred
 
         val_losses.append(val_loss)
-        val_accs.append(avg_val_acc)
+        val_accs.append(epoch_val_acc)
+
+        epoch_val_loss = sum(val_losses)/len(val_losses)
+        epoch_val_losses.append(epoch_val_loss)
 
         epoch_end = time.time()
         epoch_time = epoch_end - epoch_start
 
-        print("Validation: Loss={:.2f} | Accuracy={:.2f} | Time={:.2f}".format(val_loss, correct_pred / total_pred, epoch_time))
+        print("Validation: Loss={:.2f} | Accuracy={:.2f} | Time={:.2f}".format(epoch_val_loss, epoch_val_acc, epoch_time))
         # Validation Loop End
 
         # Update "best.pt" model if val_loss of current epoch is lower than the best validation loss
@@ -190,7 +199,7 @@ def train_samsiamese():
             )
 
         # Plot Loss and Accuracy 
-        plot_loss(train_losses, val_losses, artifact_path)
+        plot_loss(epoch_train_losses, epoch_val_losses, artifact_path)
         plot_accuracy(train_accs, val_accs, artifact_path)
 
 if __name__ == "__main__":

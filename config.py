@@ -30,4 +30,4 @@ reverse_test_csv = '../../data/processed/ccc_images_cropped_final/test/reverse_l
 
 sam_checkpoint = './content/weights/sam_vit_b_01ec64.pth'
 
-output_path = '../../../raid/intern_aliff/runs/'
+# output_path = '../../../raid/intern_aliff/runs/'
