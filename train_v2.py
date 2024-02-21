@@ -62,9 +62,9 @@ def train_siamese():
     os.makedirs(artifact_path)
 
     # Hyperparameters
-    batch_size = 32
-    num_epochs = 20
-    learning_rate = 0.005
+    batch_size = 1
+    num_epochs = 100
+    learning_rate = 1e-4
 
     # Training Settings - later to be implemented with ArgumentParser()
     contra_loss = None

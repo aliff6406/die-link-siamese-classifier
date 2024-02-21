@@ -29,17 +29,15 @@ class SiameseNetworkSAM(nn.Module):
         # Create an MLP (multi-layer perceptron) as the classification head. 
         # Classifies if inputted similarity
         self.cls_head = nn.Sequential(
-            # nn.Dropout(p=0.25),
+            nn.Dropout(p=0.5),
             nn.Linear(out_features, 1024),
+            nn.ReLU(inplace=True),
             
             nn.Linear(1024, 512),
             nn.ReLU(inplace=True),
 
-            # nn.Linear(512, 64),
-
-            # nn.Linear(64,1),
             nn.Linear(512,1),
-            # nn.Dropout(p=0.25),
+            nn.Dropout(p=0.25),
             nn.Sigmoid()
         )
 

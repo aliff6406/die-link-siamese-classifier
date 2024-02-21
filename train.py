@@ -52,7 +52,7 @@ def train_samsiamese():
     # Add ArgumentParser() later on
 
     # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    device = 'mps'
+    device = 'cuda'
     print("Device: ", device)
     # Directory Config
     train_dir = config.obverse_train_dir
@@ -60,7 +60,7 @@ def train_samsiamese():
     val_dir = config.obverse_validate_dir
     val_csv = config.obverse_validate_csv
 
-    runs_dir = './runs/'
+    runs_dir = config.output_path
 
     # Create Directory to Store Experiment Artifacts
     artifact_dir_name = cur_time()
@@ -75,14 +75,14 @@ def train_samsiamese():
     # Training Settings - later to be implemented with ArgumentParser()
     contra_margin = 1
 
-    transform = ViT_B_16_Weights.DEFAULT.transforms()
+    # transform = ViT_B_16_Weights.DEFAULT.transforms()
     # transform = transforms.Compose([
     #     transforms.Resize((512,512)),
     #     transforms.ToTensor(),
     # ])
 
-    train_dataset = SiamesePairDataset(label_dir='data/train/train_labels.csv', img_dir='data/train/', transform=transform)
-    val_dataset = SiamesePairDataset(label_dir='data/val1/train_labels.csv', img_dir='data/val1/', transform=transform)
+    train_dataset = SiameseTensorPairDataset(label_dir=train_csv, tensor_dir=train_dir)
+    val_dataset = SiameseTensorPairDataset(label_dir=val_csv, tensor_dir=val_dir)
 
     # # Default batch_size = 1 if not set
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
@@ -94,7 +94,7 @@ def train_samsiamese():
 
     # Pretrained Torch models
     # This iteration - vit_b_16 trained on ImageNet1k
-    model = SiameseNetwork()
+    model = SiameseNetworkSAM()
     model.to(device)
 
     # Initialise Loss Function
@@ -129,7 +129,7 @@ def train_samsiamese():
         # Training Loop Start
         for i, ((tensor1, tensor2), label) in enumerate(train_dataloader):
             tensor1, tensor2, label = map(lambda x: x.to(device), [tensor1, tensor2, label])
-            label = label.float()
+            label = label.view(-1)
 
             optimizer.zero_grad()
             prob = model(tensor1, tensor2)
@@ -163,7 +163,7 @@ def train_samsiamese():
 
         for (tensor1, tensor2), label in val_dataloader:
             tensor1, tensor2, label = map(lambda x: x.to(device), [tensor1, tensor2, label])
-            label = label.float()
+            label = label.view(-1)
             with torch.no_grad():
                 prob = model(tensor1, tensor2)
                 loss = criterion(prob, label)
