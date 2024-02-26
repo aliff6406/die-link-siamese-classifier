@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-class SiameseNetworkSAM(nn.Module):
+class SiameseNetwork(nn.Module):
     def __init__(self,
                  contrastive_loss=None,
                  cosine=None,
@@ -36,22 +36,22 @@ class SiameseNetworkSAM(nn.Module):
             nn.Dropout(p=0.5),
             nn.Linear(32*16*16, 512),
             nn.BatchNorm1d(512),
-            nn.Sigmoid(),
-            # nn.ReLU(),
+            # nn.Sigmoid(),
+            nn.ReLU(),
             
             nn.Dropout(p=0.5),
             nn.Linear(512, 128),
             nn.BatchNorm1d(128),
-            nn.Sigmoid(),
-            # nn.ReLU(),
+            # nn.Sigmoid(),
+            nn.ReLU(),
 
             nn.Dropout(p=0.5),
             nn.Linear(128, 1),
             nn.Sigmoid()
         )
     
-    def forward_once(self, img):
-        output = self.conv_layers(img)
+    def forward_once(self, input):
+        output = self.conv_layers(input)
         return output
     
     def forward(self, tensor1, tensor2):

@@ -67,7 +67,7 @@ def train_siamese():
     # Linear Scaling of learning rate based on [https://arxiv.org/pdf/1706.02677.pdf]
     # learning_rate = base_lr * batch_size/256
     learning_rate = 5e-2
-    # weight_decay = 5e-4
+    weight_decay = 1e-6
 
     # Training Settings - later to be implemented with ArgumentParser()
     contra_loss = None
@@ -96,7 +96,7 @@ def train_siamese():
         criterion = nn.BCELoss()
 
     # optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-    optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9)
+    optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9, weight_decay=weight_decay)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=5)
 
     best_val_loss = 100000000
@@ -111,10 +111,55 @@ def train_siamese():
     for epoch in range(num_epochs):
         print("Epoch [{} / {}]".format(epoch+1, num_epochs))
         epoch_start = time.time()
+
+        # Validation Loop Start
+        model.eval()
+        val_loss = 0.0
+        correct_pred = 0
+        total_pred = 0
+
+        for (tensor1, tensor2), label in val_dataloader:
+            tensor1, tensor2, label = map(lambda x: x.to(device), [tensor1, tensor2, label])
+            label = label.view(-1)
+
+            if contra_loss:
+                with torch.no_grad():
+                    output1, output2 = model(tensor1, tensor2)
+                    loss = criterion(output1, output2, label)
+
+                val_loss += loss.item()
+                correct_pred += torch.count_nonzero(label == (prob.squeeze(1) > 0.5)).sum().item()
+                total_pred += label.size(0)
+            else:
+                with torch.no_grad():
+                    prob = model(tensor1, tensor2)
+                    loss = criterion(prob.squeeze(1), label)
+
+                val_loss += loss.item()
+                correct_pred += torch.count_nonzero(label == (prob.squeeze(1) > 0.5)).sum().item()
+                total_pred += label.size(0)
+            
+        val_loss /= len(val_dataloader)
+        epoch_val_acc = correct_pred / total_pred
+
+        scheduler.step(val_loss)
+
+        val_losses.append(val_loss)
+        val_accs.append(epoch_val_acc)
+
+        epoch_val_loss = sum(val_losses)/len(val_losses)
+        epoch_val_losses.append(epoch_val_loss)
+
+        # epoch_end = time.time()
+        # epoch_time = epoch_end - epoch_start
+
+        print("Validation: Loss={:.2f} | Accuracy={:.2f}".format(epoch_val_loss, epoch_val_acc))
+
+        # epoch_start = time.time()
         model.train()
 
         train_loss = 0.0
-        val_loss = 0.0
+        # val_loss = 0.0
         correct_pred = 0
         total_pred = 0
 
@@ -152,51 +197,54 @@ def train_siamese():
         epoch_train_losses.append(epoch_train_loss)
         train_accs.append(epoch_train_acc)
 
-        print("Training: Loss={:.2f} | Accuracy={:.2f}".format(epoch_train_loss, epoch_train_acc))
-        # Training Loop End
-
-        # Validation Loop Start
-        model.eval()
-
-        correct_pred = 0
-        total_pred = 0
-
-        for (tensor1, tensor2), label in val_dataloader:
-            tensor1, tensor2, label = map(lambda x: x.to(device), [tensor1, tensor2, label])
-            label = label.view(-1)
-
-            if contra_loss:
-                with torch.no_grad():
-                    output1, output2 = model(tensor1, tensor2)
-                    loss = criterion(output1, output2, label)
-
-                val_loss += loss.item()
-                correct_pred += torch.count_nonzero(label == (prob.squeeze(1) > 0.5)).sum().item()
-                total_pred += label.size(0)
-            else:
-                with torch.no_grad():
-                    prob = model(tensor1, tensor2)
-                    loss = criterion(prob.squeeze(1), label)
-
-                val_loss += loss.item()
-                correct_pred += torch.count_nonzero(label == (prob.squeeze(1) > 0.5)).sum().item()
-                total_pred += label.size(0)
-            
-        val_loss /= len(val_dataloader)
-        epoch_val_acc = correct_pred / total_pred
-
-        scheduler.step(val_loss)
-
-        val_losses.append(val_loss)
-        val_accs.append(epoch_val_acc)
-
-        epoch_val_loss = sum(val_losses)/len(val_losses)
-        epoch_val_losses.append(epoch_val_loss)
-
         epoch_end = time.time()
         epoch_time = epoch_end - epoch_start
 
-        print("Validation: Loss={:.2f} | Accuracy={:.2f} | Time={:.2f}".format(epoch_val_loss, epoch_val_acc, epoch_time))
+        print("Training: Loss={:.2f} | Accuracy={:.2f} | Time={:.2f}".format(epoch_train_loss, epoch_train_acc, epoch_time))
+        # Training Loop End
+
+        # # Validation Loop Start
+        # model.eval()
+
+        # correct_pred = 0
+        # total_pred = 0
+
+        # for (tensor1, tensor2), label in val_dataloader:
+        #     tensor1, tensor2, label = map(lambda x: x.to(device), [tensor1, tensor2, label])
+        #     label = label.view(-1)
+
+        #     if contra_loss:
+        #         with torch.no_grad():
+        #             output1, output2 = model(tensor1, tensor2)
+        #             loss = criterion(output1, output2, label)
+
+        #         val_loss += loss.item()
+        #         correct_pred += torch.count_nonzero(label == (prob.squeeze(1) > 0.5)).sum().item()
+        #         total_pred += label.size(0)
+        #     else:
+        #         with torch.no_grad():
+        #             prob = model(tensor1, tensor2)
+        #             loss = criterion(prob.squeeze(1), label)
+
+        #         val_loss += loss.item()
+        #         correct_pred += torch.count_nonzero(label == (prob.squeeze(1) > 0.5)).sum().item()
+        #         total_pred += label.size(0)
+            
+        # val_loss /= len(val_dataloader)
+        # epoch_val_acc = correct_pred / total_pred
+
+        # scheduler.step(val_loss)
+
+        # val_losses.append(val_loss)
+        # val_accs.append(epoch_val_acc)
+
+        # epoch_val_loss = sum(val_losses)/len(val_losses)
+        # epoch_val_losses.append(epoch_val_loss)
+
+        # epoch_end = time.time()
+        # epoch_time = epoch_end - epoch_start
+
+        # print("Validation: Loss={:.2f} | Accuracy={:.2f} | Time={:.2f}".format(epoch_val_loss, epoch_val_acc, epoch_time))
         # Validation Loop End
 
         # Update "best.pt" model if val_loss of current epoch is lower than the best validation loss
