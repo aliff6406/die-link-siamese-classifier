@@ -6,9 +6,12 @@ import pandas as pd
 
 import torch
 from PIL import Image
+import torch.nn as nn
+import torch.nn.functional as F
+from torchvision import transforms
 
 class SiamesePairDataset(torch.utils.data.Dataset):
-    def __init__(self, label_dir, img_dir, shuffle_pairs=True, transform=None):
+    def __init__(self, label_dir, img_dir, shuffle_pairs=True, transform=None, augment=None):
         '''
         Create an iterable dataset from a directory containing images of coins and an Excel file mapping coin names to die IDs.
         
@@ -27,6 +30,15 @@ class SiamesePairDataset(torch.utils.data.Dataset):
         self.img_dir = img_dir
         self.shuffle_pairs = shuffle_pairs
         self.transform = transform
+        self.augment = augment
+
+        if self.augment:
+            self.augmentation = transforms.Compose([
+                transforms.RandomHorizontalFlip(p=0.5),
+                transforms.RandomVerticalFlip(p=0.5),
+                transforms.RandomApply([transforms.RandomRotation((90, 90))], p=0.5),
+                transforms.ColorJitter(brightness=0.3, contrast=0.5, saturation=0.3, hue=0.3)
+            ])
 
     def __len__(self):
         return len(self.image_df)

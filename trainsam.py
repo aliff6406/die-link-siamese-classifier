@@ -15,9 +15,10 @@ from torchvision import transforms, datasets
 import matplotlib.pyplot as plt
 
 import config
-from tensorsiamese import SiameseNetworkSAM
+from samsiamese import SiameseNetworkSAM
 from contrastive import ContrastiveLoss
-from tensorpair_v2 import SiameseTensorPairDataset
+from imgpair_v1 import SiamesePairDataset
+from sam import SAMImageEncoderViT
 
 def cur_time():
     fmt = '%Y-%m-%d %H:%M:%S %Z%z'
@@ -43,15 +44,15 @@ def plot_accuracy(train_accs, val_accs, out_path):
     plt.savefig(os.path.join(out_path, 'accuracy_plot.jpg'))
     plt.close()
 
-def train_siamese():
+def train_samsiamese():
     # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    device = 'cuda:1'
+    device = 'mps'
     print("Device: ", device)
     # Directory Config
-    train_dir = config.obverse_train_dir
-    train_csv = config.obverse_train_csv
-    val_dir = config.obverse_validate_dir
-    val_csv = config.obverse_validate_csv
+    train_dir = './data/ccc_images_final/388-325/train/obverses/'
+    train_csv = './data/ccc_images_final/388-325/train/train_labels.csv'
+    val_dir = './data/ccc_images_final/388-325/val/obverses/'
+    val_csv = './data/ccc_images_final/388-325/val/val_labels.csv'
 
     runs_dir = config.output_path
 
@@ -72,19 +73,25 @@ def train_siamese():
     # Training Settings - later to be implemented with ArgumentParser()
     contra_loss = None
     contra_margin = 1
-
     cosine = None
 
-    train_dataset = SiameseTensorPairDataset(label_dir=train_csv, tensor_dir=train_dir)
-    val_dataset = SiameseTensorPairDataset(label_dir=val_csv, tensor_dir=val_dir)
+    transform = transforms.Compose([
+        transforms.Resize((1024, 1024), interpolation=transforms.InterpolationMode.BILINEAR, antialias=False),
+        transforms.ToTensor()
+    ])
+
+    train_dataset = SiamesePairDataset(label_dir=train_csv, img_dir=train_dir, transform=transform, augment=True)
+    val_dataset = SiamesePairDataset(label_dir=val_csv, img_dir=val_dir, transform=transform)
 
     # # Default batch_size = 1 if not set
-    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
-    val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, drop_last=True)
+    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
     # Pretrained Torch models
     model = SiameseNetworkSAM(contrastive_loss=contra_loss)
+    sam = SAMImageEncoderViT()
     model.to(device)
+    sam.to(device)
 
     # Initialise Loss Function
     # criterion = nn.BCELoss()
@@ -119,15 +126,29 @@ def train_siamese():
         total_pred = 0
 
         # Training Loop Start
-        for (tensor1, tensor2), label in train_dataloader:
-            tensor1, tensor2, label = map(lambda x: x.to(device), [tensor1, tensor2, label])
-
+        for i, (img1_batch, img2_batch, label) in enumerate(train_dataloader):
+            img1_batch, img2_batch, label = map(lambda x: x.to(device), [img1_batch, img2_batch, label])
             label = label.view(-1)
+
+            img1_sam = []
+            img2_sam = []
+
+            for img1, img2 in zip(img1_batch, img2_batch):
+                img1, img2 = img1.to(device), img2.to(device)
+
+                img1_emb = sam(img1.unsqueeze(0))
+                img2_emb = sam(img2.unsqueeze(0))
+
+                img1_sam.append(img1_emb.squeeze(0))
+                img2_sam.append(img2_emb.squeeze(0))
+
+            img1_batch = torch.stack(img1_sam)
+            img2_batch = torch.stack(img2_sam)
 
             optimizer.zero_grad()
 
             if contra_loss:
-                output1, output2 = model(tensor1, tensor2)
+                output1, output2 = model(img1_batch, img2_batch)
                 loss = criterion(output1, output2, label)
                 loss.backward()
                 optimizer.step()
@@ -135,7 +156,7 @@ def train_siamese():
                 correct_pred += torch.count_nonzero(label == (prob.squeeze(1) > 0.5)).sum().item()
                 total_pred += label.size(0)
             else:
-                prob = model(tensor1, tensor2)
+                prob = model(img1_batch, img2_batch)
                 loss = criterion(prob.squeeze(1), label)
                 loss.backward()
                 optimizer.step()
@@ -161,13 +182,28 @@ def train_siamese():
         correct_pred = 0
         total_pred = 0
 
-        for (tensor1, tensor2), label in val_dataloader:
-            tensor1, tensor2, label = map(lambda x: x.to(device), [tensor1, tensor2, label])
+        for i, (img1_batch, img2_batch, label) in enumeraet(val_dataloader):
+            img1_batch, img2_batch, label = map(lambda x: x.to(device), [img1_batch, img2_batch, label])
             label = label.view(-1)
+
+            img1_sam = []
+            img2_sam = []
+
+            for img1, img2 in zip(img1_batch, img2_batch):
+                img1, img2 = img1.to(device), img2.to(device)
+
+                img1_emb = sam(img1.unsqueeze(0))
+                img2_emb = sam(img2.unsqueeze(0))
+
+                img1_sam.append(img1_emb.squeeze(0))
+                img2_sam.append(img2_emb.squeeze(0))
+
+            img1_batch = torch.stack(img1_sam)
+            img2_batch = torch.stack(img2_sam)
 
             if contra_loss:
                 with torch.no_grad():
-                    output1, output2 = model(tensor1, tensor2)
+                    output1, output2 = model(img1_batch, img2_batch)
                     loss = criterion(output1, output2, label)
 
                 val_loss += loss.item()
@@ -175,7 +211,7 @@ def train_siamese():
                 total_pred += label.size(0)
             else:
                 with torch.no_grad():
-                    prob = model(tensor1, tensor2)
+                    prob = model(img1_batch, img2_batch)
                     loss = criterion(prob.squeeze(1), label)
 
                 val_loss += loss.item()
@@ -216,4 +252,4 @@ def train_siamese():
         plot_accuracy(train_accs, val_accs, artifact_path)
 
 if __name__ == "__main__":
-    train_siamese()
+    train_samsiamese()
