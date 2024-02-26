@@ -182,7 +182,7 @@ def train_samsiamese():
         correct_pred = 0
         total_pred = 0
 
-        for i, (img1_batch, img2_batch, label) in enumeraet(val_dataloader):
+        for i, (img1_batch, img2_batch, label) in enumerate(val_dataloader):
             img1_batch, img2_batch, label = map(lambda x: x.to(device), [img1_batch, img2_batch, label])
             label = label.view(-1)
 
