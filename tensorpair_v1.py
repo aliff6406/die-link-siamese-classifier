@@ -6,7 +6,7 @@ import torch
 from torch.utils.data import Dataset
 
 class SiameseTensorPairDataset(Dataset):
-    def __init__(self, label_dir, tensor_dir, shuffle_pairs=True):
+    def __init__(self, label_dir, tensor_dir, shuffle_pairs=True, val=None):
         '''
         Create an iterable dataset from a directory containing precomputed tensors of coin images and 
         a CSV file mapping tensor filenames to die IDs.
@@ -23,12 +23,14 @@ class SiameseTensorPairDataset(Dataset):
         self.tensor_df = pd.read_csv(label_dir, header=None)
         self.tensor_dir = tensor_dir
         self.shuffle_pairs = shuffle_pairs
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.val = val
 
     def __len__(self):
         return len(self.tensor_df)
     
     def __getitem__(self, idx):
+        if self.val:
+            random.seed(42)
         # Construct the path for the first tensor
         tensor_path = os.path.join(self.tensor_dir, self.tensor_df.iloc[idx, 0])
         tensor = torch.load(tensor_path, map_location='cpu')

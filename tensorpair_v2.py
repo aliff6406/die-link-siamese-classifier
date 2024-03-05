@@ -6,7 +6,7 @@ import torch
 from torch.utils.data import Dataset
 
 class SiameseTensorPairDataset(Dataset):
-    def __init__(self, label_dir, tensor_dir, shuffle_pairs=True):
+    def __init__(self, label_dir, tensor_dir, shuffle_pairs=True, val=None):
         '''
         Create an iterable dataset from a directory containing precomputed tensors of coin images and 
         a CSV file mapping tensor filenames to die IDs.
@@ -24,40 +24,30 @@ class SiameseTensorPairDataset(Dataset):
         self.tensor_dir = tensor_dir
         self.shuffle_pairs = shuffle_pairs
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.val = val
 
     def __len__(self):
         return len(self.tensor_df)
     
     def __getitem__(self, idx):
-        # Randomly select a class with equal probability
-        unique_labels = self.tensor_df[1].unique()
-        label = random.choice(unique_labels)
-
-        # Get indices of all tensors within the chosen class
-        same_label_indices = self.tensor_df[self.tensor_df[1] == label].index.tolist()
-
-        # Randomly select a tensor
-        idx = random.choice(same_label_indices)
+        if self.val:
+            random.seed(42)
+        # Construct the path for the first tensor
         tensor_path = os.path.join(self.tensor_dir, self.tensor_df.iloc[idx, 0])
         tensor = torch.load(tensor_path, map_location='cpu')
+        label = self.tensor_df.iloc[idx, 1]
 
-        # Randomly choose to get a positive or negative pair
-        positive_pair = random.choice([True, False])
-
-        if positive_pair:
-            # Find another tensor of the same class
-            same_label_indices = self.tensor_df[self.tensor_df[1] == label].index.tolist()
-
-            if len(same_label_indices) == 1: # If only one tensor in this class, pair it with itself
-                pair_idx = idx
-            else:
-                same_label_indices.remove(idx) # Exclude the current tensor
-                pair_idx = random.choice(same_label_indices)
+        # Find another tensor of the same class
+        same_class_indices = self.tensor_df[self.tensor_df[1] == label].index.tolist()
+        if len(same_class_indices) == 1: # If only one tensor in this class, pair it with itself
+            pair_idx = idx
         else:
-            different_labels = [label_ for label_ in unique_labels if label_ != label]
-            different_label = random.choice(different_labels)
-            different_label_indices = self.tensor_df[self.tensor_df[1] == different_label].index.tolist()
-            pair_idx = random.choice(different_label_indices)
+            same_class_indices.remove(idx) # Exclude the current tensor
+            pair_idx = random.choice(same_class_indices)
+            
+        # Find another tensor of a different class
+        different_class_indices = self.tensor_df[self.tensor_df[1] != label].index.tolist()
+        pair_idx = random.choice(different_class_indices)
 
         # Load the paired tensor
         tensor_pair_path = os.path.join(self.tensor_dir, self.tensor_df.iloc[pair_idx, 0])

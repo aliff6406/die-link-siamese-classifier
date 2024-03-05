@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 # Custom Imports
 import config
 from tensorsiamese import SiameseNetwork
-from tensorpair_v2 import SiameseTensorPairDataset
+from tensorpair_v1 import SiameseTensorPairDataset
 
 def cur_time():
     fmt = '%Y-%m-%d %H:%M:%S %Z%z'
@@ -38,7 +38,7 @@ def plot_accuracy(train_accs, val_accs, out_path):
     plt.savefig(os.path.join(out_path, 'accuracy_plot.jpg'))
     plt.close()
 
-def train(train_dataloader, model, criterion, optimizer, device, train_losses, epoch_train_losses, epoch_train_accs, total_train_loss):
+def train(train_dataloader, model, criterion, optimizer, device, train_losses, epoch_train_losses, epoch_train_accs, total_train_loss, train_samples):
     model.train()
     correct_pred = 0
     total_pred = 0
@@ -46,14 +46,18 @@ def train(train_dataloader, model, criterion, optimizer, device, train_losses, e
     for (tensor1, tensor2), label in train_dataloader:
         tensor1, tensor2, label = map(lambda x: x.to(device), [tensor1, tensor2, label])
         label = label.view(-1)
-        optimizer.zero_grad()
+
         prob = model(tensor1, tensor2)
         loss = criterion(prob.squeeze(1), label)
+
+        optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+
         total_train_loss += loss.item()
         correct_pred += torch.count_nonzero(label == (prob.squeeze(1) > 0.5)).sum().item()
         total_pred += label.size(0)
+        train_samples += label.size(0)
 
     total_train_loss /= len(train_dataloader)
     epoch_train_acc = correct_pred / total_pred
@@ -63,9 +67,9 @@ def train(train_dataloader, model, criterion, optimizer, device, train_losses, e
     epoch_train_losses.append(epoch_train_loss)
     epoch_train_accs.append(epoch_train_acc)
 
-    print("Training: Loss={:.2f} | Accuracy={:.2f}".format(epoch_train_loss, epoch_train_acc))
+    print("Training: Loss={:.2f} | Accuracy={:.2f} | Number of Training Pairs={}".format(epoch_train_loss, epoch_train_acc, train_samples))
     
-def validate(val_dataloader, model, criterion, device, scheduler, val_losses, epoch_val_accs, epoch_val_losses, total_val_loss):
+def validate(val_dataloader, model, criterion, device, scheduler, val_losses, epoch_val_accs, epoch_val_losses, total_val_loss, val_samples):
     model.eval()    
     correct_pred = 0
     total_pred = 0
@@ -81,6 +85,7 @@ def validate(val_dataloader, model, criterion, device, scheduler, val_losses, ep
                 total_val_loss += loss.item()
                 correct_pred += torch.count_nonzero(label == (prob.squeeze(1) > 0.5)).sum().item()
                 total_pred += label.size(0)
+                val_samples += label.size(0)
 
     total_val_loss /= len(val_dataloader)
     epoch_val_acc = correct_pred / total_pred
@@ -91,7 +96,9 @@ def validate(val_dataloader, model, criterion, device, scheduler, val_losses, ep
     epoch_val_loss = sum(val_losses)/len(val_losses)
     epoch_val_losses.append(epoch_val_loss)
 
-    print("Validation: Loss={:.2f} | Accuracy={:.2f}".format(epoch_val_loss, epoch_val_acc))
+    print("Validation: Loss={:.2f} | Accuracy={:.2f} | Number of Val Pairs={}".format(epoch_val_loss, epoch_val_acc, val_samples))
+
+    return epoch_val_loss
 
 
 def main():
@@ -112,30 +119,28 @@ def main():
 
     # HYPERPARAMETERS
     # Linear Scaling of learning rate based on [https://arxiv.org/pdf/1706.02677.pdf]
-    # learning_rate = base_lr * batch_size/256
-    batch_size = 16
+    batch_size = 32
     num_epochs = 100
+    # base_lr = 5e-2
+    # learning_rate = base_lr * batch_size/256
     learning_rate = 1e-3
-    weight_decay = 1e-6
+    weight_decay = 1e-3
 
     train_dataset = SiameseTensorPairDataset(label_dir=train_csv, tensor_dir=train_dir)
-    val_dataset = SiameseTensorPairDataset(label_dir=val_csv, tensor_dir=val_dir)
-    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
-    val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, drop_last=True)
+    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+
+    val_dataset = SiameseTensorPairDataset(label_dir=val_csv, tensor_dir=val_dir, val=True)
+    val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
     # Build Model
     model = SiameseNetwork()
     model.to(device)
 
     # Optimizer, LR Scheduler and Criterion (Loss Function)
-    params = []
-    for key, value in dict(model.named_parameters()).items():
-        if value.requires_grad:
-            params += [{'params': [value]}]
     # optimizer = torch.optim.Adam(params, lr=learning_rate)
-    optimizer = torch.optim.SGD(params, lr=learning_rate, momentum=0.9, weight_decay=weight_decay)
+    optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9)
     # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=5)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1)
     criterion = nn.BCELoss()
 
     best_val_loss = 100000000
@@ -146,6 +151,7 @@ def main():
     epoch_val_accs = []
     training_times = []
 
+    print(f"Initial Best Val Loss: {best_val_loss}")
     for epoch in range(num_epochs):
         print("Epoch [{} / {}]".format(epoch+1, num_epochs))
         epoch_start = time.time()
@@ -154,11 +160,13 @@ def main():
         total_train_loss = 0.0
         train_losses = []
         val_losses = []
+        train_samples = 0
+        val_samples = 0
 
-        train(train_dataloader, model, criterion, optimizer, device, train_losses, epoch_train_losses, epoch_train_accs, total_train_loss)
-        validate(val_dataloader, model, criterion, device, scheduler, val_losses, epoch_val_accs, epoch_val_losses, total_val_loss)
+        train(train_dataloader, model, criterion, optimizer, device, train_losses, epoch_train_losses, epoch_train_accs, total_train_loss, train_samples)
+        val_loss = validate(val_dataloader, model, criterion, device, scheduler, val_losses, epoch_val_accs, epoch_val_losses, total_val_loss, val_samples)
 
-        # scheduler.step()
+        scheduler.step()
 
         epoch_end = time.time()
         epoch_time = epoch_end - epoch_start
@@ -166,8 +174,9 @@ def main():
         print("Epoch Training Time: {:.2f}".format(epoch_time))
 
 
-        if total_val_loss < best_val_loss:
-            best_val_loss = total_val_loss
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            print(f"New Best Val Loss: {best_val_loss} at Epoch {epoch + 1}")
             torch.save(
                 {
                     "epoch": epoch + 1,
