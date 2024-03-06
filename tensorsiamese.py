@@ -66,7 +66,7 @@ class SiameseNetwork(nn.Module):
             nn.BatchNorm1d(128),
             nn.ReLU(),
 
-            # nn.Dropout(p=0.5),
+            nn.Dropout(p=0.5),
             nn.Linear(128, 1),
             nn.Sigmoid()
         )

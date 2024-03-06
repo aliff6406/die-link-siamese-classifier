@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import config
 from tensorsiamese import SiameseNetwork
 from online_pair import SiameseTensorPairDataset
+from offline_pair import OfflinePairDataset
 
 def cur_time():
     fmt = '%Y-%m-%d %H:%M:%S %Z%z'
@@ -112,6 +113,10 @@ def main():
     val_csv = config.obverse_validate_csv
     runs_dir = config.output_path
 
+    train_pairs = config.combined_train
+    val_pairs = config.combined_val
+    tensors = config.combined_tensors
+
     # Create Directory to Store Experiment Artifacts
     artifact_dir_name = cur_time()
     artifact_path = os.path.join(runs_dir, artifact_dir_name)
@@ -126,11 +131,17 @@ def main():
     learning_rate = 1e-3
     weight_decay = 1e-3
 
-    train_dataset = SiameseTensorPairDataset(label_dir=train_csv, tensor_dir=train_dir)
+    train_dataset = OfflinePairDataset(pair_dir=train_pairs, tensor_dir=tensors)
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
-    val_dataset = SiameseTensorPairDataset(label_dir=val_csv, tensor_dir=val_dir, val=True)
+    val_dataset = OfflinePairDataset(pair_dir=val_pairs, tensor_dir=tensors)
     val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+
+    # train_dataset = SiameseTensorPairDataset(label_dir=train_csv, tensor_dir=train_dir)
+    # train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+
+    # val_dataset = SiameseTensorPairDataset(label_dir=val_csv, tensor_dir=val_dir, val=True)
+    # val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
     # Build Model
     model = SiameseNetwork()
@@ -140,7 +151,7 @@ def main():
     # optimizer = torch.optim.Adam(params, lr=learning_rate)
     optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9)
     # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=5)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
     criterion = nn.BCELoss()
 
     best_val_loss = 100000000

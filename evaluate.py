@@ -6,18 +6,18 @@ from torch.utils.data import DataLoader
 
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, roc_curve, auc
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, roc_curve, auc, confusion_matrix
 
 import tripletsiamese
 import tensorsiamese
-from tensorpair_test import SiameseTensorPairDataset
+from offline_pair import OfflinePairDataset
 from eval_metrics import evaluate, plot_roc
 
 import config
 
 def eval_bce():
-    test_dir = config.obverse_test_dir
-    test_csv = config.obverse_test_csv
+    test_pairs = config.obverse_test
+    obverse_tensors = config.obverse_tensors
 
     model = tensorsiamese.SiameseNetwork()
     model.to('cuda')
@@ -28,8 +28,8 @@ def eval_bce():
     model.load_state_dict(checkpoint['model_state_dict'])
     print("epoch: ", checkpoint['epoch'])
 
-    test_dataset = SiameseTensorPairDataset(label_dir=test_csv, tensor_dir=test_dir)
-    test_loader = DataLoader(test_dataset, batch_size=1024, shuffle=False)
+    test_dataset = OfflinePairDataset(pair_dir=test_pairs, tensor_dir=obverse_tensors)
+    test_loader = DataLoader(test_dataset, batch_size=128, shuffle=False)
 
     # Lists to store predictions and labels
     all_preds = []
@@ -44,13 +44,17 @@ def eval_bce():
             prob = model(tensor1, tensor2).squeeze(1)
 
             # Store predictions and labels
-            all_preds.extend(prob.cpu().numpy())
+            all_preds.extend((prob > 0.5).cpu().numpy())
             all_labels.extend(label.cpu().numpy())
 
     # Convert lists to numpy arrays
-    all_preds = np.array(all_preds)
-    all_labels = np.array(all_labels)
+    all_preds = np.array(all_preds).flatten()
+    all_labels = np.array(all_labels).flatten()
 
+    cm = confusion_matrix(all_labels, all_preds)
+
+    tn, fp, fn, tp = cm([0, 1, 0, 1], [1, 1, 1, 0]).ravel()
+    
     # Calculate metrics
     accuracy = (all_labels == (all_preds > 0.5)).mean()
     precision = precision_score(all_labels, all_preds > 0.5)
@@ -59,7 +63,9 @@ def eval_bce():
     auc = roc_auc_score(all_labels, all_preds)
 
     # Print metrics
+    print(f'TP: {tp} | FP: {fp} | TN: {tn} | FN: {fn}')
     print(f'Accuracy: {accuracy}')
+    print(f'Accuracy (from cm): {(tp+tn)/(tp+tn+fp+fn)}')
     print(f'Precision: {precision}')
     print(f'Recall: {recall}')
     print(f'F1 Score: {f1}')

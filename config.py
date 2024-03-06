@@ -7,6 +7,24 @@ obverse_validate_csv = './data/ccc_tensors/val/val_labels.csv'
 obverse_test_dir = './data/ccc_tensors/test/obverses'
 obverse_test_csv = './data/ccc_tensors/test/test_labels.csv'
 
+obverse_train = './data/ccc_tensors/obverse/train_dataset.csv'
+obverse_val = './data/ccc_tensors/obverse/val_dataset.csv'
+obverse_test = './data/ccc_tensors/obverse/test_dataset.csv'
+
+obverse_tensors = './data/ccc_tensors/obverse/data/'
+
+reverse_train = './data/ccc_tensors/reverse/train_dataset.csv'
+reverse_val = './data/ccc_tensors/reverse/val_dataset.csv'
+reverse_test = './data/ccc_tensors/reverse/test_dataset.csv'
+
+reverse_tensors = './data/ccc_tensors/reverse/data/'
+
+combined_train = './data/ccc_tensors/combined/train_dataset.csv'
+combined_val = './data/ccc_tensors/combined/val_dataset.csv'
+combined_test = './data/ccc_tensors/combined/test_dataset.csv'
+
+combined_tensors = './data/ccc_tensors/combined/data/'
+
 # image dataset
 # obverse_train_dir = '../../../raid/intern_aliff/ccc_images_final/train/obverses'
 # obverse_train_csv = '../../../raid/intern_aliff/ccc_images_final/train/obverse_train_labels.csv'
