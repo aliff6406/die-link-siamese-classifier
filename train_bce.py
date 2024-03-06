@@ -125,7 +125,7 @@ def main():
     # HYPERPARAMETERS
     # Linear Scaling of learning rate based on [https://arxiv.org/pdf/1706.02677.pdf]
     batch_size = 32
-    num_epochs = 100
+    num_epochs = 30
     # base_lr = 5e-2
     # learning_rate = base_lr * batch_size/256
     learning_rate = 1e-3
