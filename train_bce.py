@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 # Custom Imports
 import config
 from tensorsiamese import SiameseNetwork
-from tensorpair_v1 import SiameseTensorPairDataset
+from online_pair import SiameseTensorPairDataset
 
 def cur_time():
     fmt = '%Y-%m-%d %H:%M:%S %Z%z'
