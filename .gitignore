@@ -109,9 +109,6 @@ target/
 # exclude all .npy files
 **/*.npy
 
-# exclude all jupyter notebooks
-**/*.ipynb
-
 # exclude Google API credential jsons
 learned-vehicle-413021-e5e1c0fdd9a7.json
 client_secret_986639034005-aet254mkkmut8fu48o6g8brvqlret5fq.apps.googleusercontent.com.json
