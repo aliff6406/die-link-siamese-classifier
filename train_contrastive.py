@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 # Custom Imports
 import config
 from tensorsiamese import SiameseNetwork
-from contrastive import ContrastiveLoss
+from losses import ContrastiveLoss
 from online_pair import SiameseTensorPairDataset
 
 def cur_time():

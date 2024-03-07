@@ -14,7 +14,7 @@ class ContrastiveLoss(torch.nn.Module):
 
     def forward(self, emb1, emb2, label):
         # Modified Contrastive Loss function where similar pairs have a label of 1 and dissmilar pairs have a label of 0
-        euclidean_dist = F.pairwise_distance(emb1, emb2, keepdim=True)
+        euclidean_dist = F.pairwise_distance(emb1, emb2, p=2)
         positive = (label) * torch.pow(euclidean_dist, 2)
         negative = (1-label) * torch.pow(torch.clamp(self.margin - euclidean_dist, min=0.0), 2)
         loss_contrastive = torch.mean(positive + negative)

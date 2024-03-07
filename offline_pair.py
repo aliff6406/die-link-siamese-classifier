@@ -22,4 +22,4 @@ class OfflinePairDataset(Dataset):
         tensor2 = torch.load(tensor2_path, map_location='cpu').squeeze()
 
         # Return the tensor pair and the label (1 for positive pair, 0 for negative pair)
-        return (tensor1, tensor2), torch.tensor(label, dtype=torch.float32)
+        return tensor1, tensor2, torch.tensor(label, dtype=torch.float32)
