@@ -4,14 +4,20 @@ import argparse
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+
+import numpy as np
+
+from pytorch_metric_learning import distances, losses, miners
 
 # Custom Imports
 import config
 from tensorsiamese import SiameseNetwork
+from losses import ContrastiveLoss
 from online_pair import SiameseTensorPairDataset
 from offline_pair import OfflinePairDataset
 from utils import cur_time, write_csv, init_log, init_run_log, create_if_not_exist, load_losses_accs
-from eval_metrics import evaluate_bce, evaluate, plot_loss, plot_accuracy, plot_roc
+from eval_metrics import evaluate, plot_loss, plot_accuracy, plot_roc
 
 # Global variables
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -56,7 +62,7 @@ def main():
     # optimizer = torch.optim.Adam(model.parameters(), lr=initial_learning_rate)
     optimizer = torch.optim.SGD(model.parameters(), lr=initial_lr, momentum=optim_momentum)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=scheduler_step_size, gamma=scheduler_gamma)
-    criterion = nn.BCELoss()
+    criterion = nn.TripletMarginWithDistanceLoss()
 
     write_csv(f"{artifact_path}/hyperparameters.csv", [num_epochs, initial_lr, batch_size, weight_decay,
                                                     optimizer.__class__.__name__, optim_momentum, 
@@ -89,10 +95,11 @@ def main():
 
     plot_loss(train_losses, val_losses, artifact_path)
     plot_accuracy(train_accs, val_accs, artifact_path)
+
 def train_val(model, optimizer, criterion, epoch, dataloaders, scheduler, batch_size):
     for phase in ['train', 'val']:
         
-        preds, labels = [], []
+        distances, labels = [], []
         loss_sum = 0.0
 
         if phase == 'train':
@@ -100,31 +107,44 @@ def train_val(model, optimizer, criterion, epoch, dataloaders, scheduler, batch_
         else:
             model.eval()
 
-        for tensor1, tensor2, label in dataloaders[phase]:
-            tensor1, tensor2, label = map(lambda x: x.to(device), [tensor1, tensor2, label])
-            label = label.view(-1)
+        for anchor, positive, negative in dataloaders[phase]:
+            anchor, positive, negative = map(lambda x: x.to(device), [anchor, positive, negative])
 
             # Calculate gradients when phase == 'train'
             with torch.set_grad_enabled(phase == 'train'):
-                prob = model(tensor1, tensor2)
-                loss = criterion(prob.squeeze(1), label)
-
+                anc_emb, pos_emb, neg_emb = model(anchor, positive, negative)
+                
+                # Euclidean distance by default
+                loss = F.triplet_margin_with_distance_loss(anc_emb, pos_emb, neg_emb
+                                                           )
                 if phase == 'train':
                     optimizer.zero_grad()
                     loss.backward()
                     optimizer.step()
                 
+                ap_dist = F.pairwise_distance(anc_emb, pos_emb, p=2)
+                an_dist = F.pairwise_distance(anc_emb, neg_emb, p=2)
+
+                distances.append(ap_dist.cpu().detach().numpy())
+                labels.append(np.ones(ap_dist.size(0)))
+
+                distances.append(an_dist.cpu().detach().numpy())
+                labels.append(np.zeros(an_dist.size(0)))
+
                 loss_sum += loss.item()
-                preds.append((prob > 0.5).cpu().detach().numpy())
-                labels.append(label.cpu().detach().numpy())
 
         avg_loss = loss_sum / len(dataloaders[phase])
-        tpr, fpr, acc = evaluate_bce(preds, labels)
+        labels = np.array(labels).flatten()
+        distances = np.array(distances).flatten()
 
-        print("{}: Loss = {:.4f} | Accuracy = {:.4f}".format(phase, avg_loss, acc))
+        tpr, fpr, acc = evaluate(distances, labels)
+
+        accuracy = np.mean(acc)
+
+        print("{}: Loss = {:.4f} | Accuracy = {:.4f}".format(phase, avg_loss, accuracy))
 
         lr = '_'.join(map(str, scheduler.get_lr()))
-        write_csv(f"{artifact_path}/{phase}.csv", [epoch, avg_loss, acc, batch_size, lr])
+        write_csv(f"{artifact_path}/{phase}.csv", [epoch, avg_loss, accuracy, batch_size, lr])
 
         if phase == 'val':
             return avg_loss, acc
