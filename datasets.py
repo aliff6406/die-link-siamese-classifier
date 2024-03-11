@@ -24,8 +24,8 @@ class OfflinePairDataset(Dataset):
         return tensor1, tensor2, torch.tensor(label, dtype=torch.float32)
     
 class OfflineTripletDataset(Dataset):
-    def __init__(self, pair_dir, tensor_dir, shuffle_pairs=True):
-        self.triplet_df = pd.read_csv(pair_dir, header=None)
+    def __init__(self, triplet_dir, tensor_dir, shuffle_pairs=True):
+        self.triplet_df = pd.read_csv(triplet_dir, header=None)
         self.tensor_dir = tensor_dir
         self.shuffle_pairs = shuffle_pairs
 
@@ -43,3 +43,22 @@ class OfflineTripletDataset(Dataset):
 
         return anchor, positive, negative
     
+class OnlineTripletDataset(Dataset):
+    '''
+    Complete Combined / Obverse / Reverse Dataset to be used with Triplet Miner
+
+    '''
+    def __init__(self, label_dir, tensor_dir):
+        self.label_df = pd.read_csv(label_dir, header=None)
+        self.tensor_dir = tensor_dir
+
+    def __len__(self):
+        return len(self.label_df)
+
+    def __getitem__(self, idx):
+        tensor_path = os.path.join(self.tensor_dir, self.label_df.iloc[idx, 0])
+        label = self.label_df.iloc[idx, 1]
+
+        tensor = torch.load(tensor_path, map_location='cpu').squeeze()
+
+        return tensor, label

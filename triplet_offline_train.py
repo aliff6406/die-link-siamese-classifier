@@ -141,7 +141,7 @@ def train_val(model, optimizer, criterion, epoch, dataloaders, scheduler, batch_
 
         accuracy = np.mean(acc)
 
-        print("{}: Loss = {:.4f} | Accuracy = {:.4f}".format(phase, avg_loss, accuracy))
+        print("{}: Loss = {:.8f} | Accuracy = {:.8f}".format(phase, avg_loss, accuracy))
 
         lr = '_'.join(map(str, scheduler.get_lr()))
         write_csv(f"{artifact_path}/{phase}.csv", [epoch, avg_loss, accuracy, batch_size, lr])

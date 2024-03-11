@@ -16,6 +16,9 @@ source "$venv_name/bin/activate"
 # Install pip upgrade
 pip3 install --upgrade pip
 
+# Install torch==1.12.0+cu113 for training on dgx
+pip3 install torch==1.12.0+cu113 torchvision==0.13.0+cu113 torchaudio==0.12.0 --extra-index-url https://download.pytorch.org/whl/cu113
+
 # Install project dependencies using pip
 pip3 install -r remote_requirements.txt
 
