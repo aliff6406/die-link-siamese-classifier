@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 
 # Custom Imports
 import config
-from tensorsiamese import SiameseNetwork
+from siamese import SiameseNetwork
 from losses import ContrastiveLoss
 from online_pair import SiameseTensorPairDataset
 

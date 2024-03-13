@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 # Custom Imports
 import config
-from tensorsiamese import SiameseNetwork
+from siamese import SiameseNetwork
 from online_pair import SiameseTensorPairDataset
 from offline_pair import OfflinePairDataset
 from utils import cur_time

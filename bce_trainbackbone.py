@@ -8,13 +8,13 @@ import torch.nn as nn
 # Custom Imports
 import config
 from siamese import SiameseNetwork
-from datasets import OfflinePairDataset
+from datasets import OfflineImagePairDataset
 from utils import cur_time, write_csv, init_log, init_run_log, create_if_not_exist, load_losses_accs
 from eval_metrics import evaluate_bce, evaluate, plot_loss, plot_accuracy, plot_roc
 
 # Global variables
-device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
-artifact_path = os.path.join(config.sam_bce_out, cur_time())
+device = torch.device('cuda:7' if torch.cuda.is_available() else 'cpu')
+artifact_path = os.path.join(config.vgg_bce_out, cur_time())
 
 def main():
     os.makedirs(artifact_path)
@@ -23,9 +23,9 @@ def main():
     init_log(f"{artifact_path}/val.csv")
     init_run_log(f"{artifact_path}/hyperparameters.csv")
 
-    train_pairs = config.pair_combined_train
-    val_pairs = config.pair_combined_val
-    tensors = config.tensor_data
+    train_pairs = config.img_pair_combined_train
+    val_pairs = config.img_pair_combined_val
+    images = config.img_data
 
     # HYPERPARAMETERS
     # Linear Scaling of learning rate based on [https://arxiv.org/pdf/1706.02677.pdf]
@@ -41,19 +41,19 @@ def main():
     
 
     coin_dataset = {
-        'train': OfflinePairDataset(pair_dir=train_pairs, tensor_dir=tensors),
-        'val': OfflinePairDataset(pair_dir=val_pairs, tensor_dir=tensors)
+        'train': OfflineImagePairDataset(pair_dir=train_pairs, img_dir=images, transform='resnet50'),
+        'val': OfflineImagePairDataset(pair_dir=val_pairs, img_dir=images, transform='resnet50')
     }
 
     dataloaders = {
         x:torch.utils.data.DataLoader(coin_dataset[x],batch_size=batch_size, shuffle=True if x=='train' else False)
         for x in ['train','val']}
     
-    model = SiameseNetwork()
+    model = SiameseNetwork(backbone='vgg16')
     model.to(device)
 
-    # optimizer = torch.optim.Adam(model.parameters(), lr=initial_lr, betas=())
-    optimizer = torch.optim.SGD(model.parameters(), lr=initial_lr, momentum=optim_momentum)
+    optimizer = torch.optim.Adam(model.parameters(), lr=initial_lr)
+    # optimizer = torch.optim.SGD(model.parameters(), lr=initial_lr, momentum=optim_momentum)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=scheduler_step_size, gamma=scheduler_gamma)
     criterion = nn.BCELoss()
 

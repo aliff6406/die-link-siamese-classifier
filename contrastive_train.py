@@ -10,16 +10,15 @@ import numpy as np
 
 # Custom Imports
 import config
-from tensorsiamese import SiameseNetwork
+from siamese import SiameseNetwork
 from losses import ContrastiveLoss
-from online_pair import SiameseTensorPairDataset
-from offline_pair import OfflinePairDataset
+from datasets import OfflinePairDataset
 from utils import cur_time, write_csv, init_log, init_run_log, create_if_not_exist, load_losses_accs
 from eval_metrics import evaluate, plot_loss, plot_accuracy, plot_roc
 
 # Global variables
-device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-artifact_path = os.path.join(config.sam_bce_out, cur_time())
+device = torch.device('cuda:2' if torch.cuda.is_available() else 'cpu')
+artifact_path = os.path.join(config.sam_contrastive_out, cur_time())
 
 def main():
     os.makedirs(artifact_path)
@@ -27,13 +26,13 @@ def main():
     init_log(f"{artifact_path}/val.csv")
     init_run_log(f"{artifact_path}/hyperparameters.csv")
 
-    train_pairs = config.combined_train
-    val_pairs = config.combined_val
-    tensors = config.combined_tensors
+    train_pairs = config.pair_combined_train
+    val_pairs = config.pair_combined_test
+    tensors = config.tensor_data
 
     # HYPERPARAMETERS
     # Linear Scaling of learning rate based on [https://arxiv.org/pdf/1706.02677.pdf]
-    num_epochs = 30
+    num_epochs = 50
     batch_size = 32
     initial_lr = 1e-3
     # weight_decay = 1e-3
@@ -50,10 +49,10 @@ def main():
     }
 
     dataloaders = {
-        x:torch.utils.DataLoader(coin_dataset[x],batch_size=batch_size, shuffle=True if x=='train' else False)
+        x:torch.utils.data.DataLoader(coin_dataset[x],batch_size=batch_size, shuffle=True if x=='train' else False)
         for x in ['train','val']}
     
-    model = SiameseNetwork()
+    model = SiameseNetwork(contrastive_loss=True)
     model.to(device)
 
     # optimizer = torch.optim.Adam(model.parameters(), lr=initial_learning_rate)
@@ -65,6 +64,7 @@ def main():
                                                     optimizer.__class__.__name__, optim_momentum, 
                                                     scheduler.__class__.__name__, criterion.__class__.__name__, 
                                                     scheduler_step_size, scheduler_gamma])
+    
     best_val_loss = 100000000
 
     for epoch in range(num_epochs):
@@ -112,7 +112,7 @@ def train_val(model, optimizer, criterion, epoch, dataloaders, scheduler, batch_
             with torch.set_grad_enabled(phase == 'train'):
                 emb1, emb2 = model(tensor1, tensor2)
                 
-                loss = criterion(emb1, emb2)
+                loss = criterion(emb1, emb2, label)
 
                 if phase == 'train':
                     optimizer.zero_grad()
@@ -121,8 +121,8 @@ def train_val(model, optimizer, criterion, epoch, dataloaders, scheduler, batch_
                 
                 distance = F.pairwise_distance(emb1, emb2, p=2)
 
-                distances.append(distance.cpu().detach().numpy())
-                labels.append(label.cpu().detach().numpy())
+                distances.extend(distance.cpu().detach().numpy().flatten())
+                labels.extend(label.cpu().detach().numpy().flatten())
 
                 loss_sum += loss.item()
 
@@ -136,7 +136,7 @@ def train_val(model, optimizer, criterion, epoch, dataloaders, scheduler, batch_
 
         print("{}: Loss = {:.4f} | Accuracy = {:.4f}".format(phase, avg_loss, accuracy))
 
-        lr = '_'.join(map(str, scheduler.get_lr()))
+        lr = '_'.join(map(str, scheduler.get_last_lr()))
         write_csv(f"{artifact_path}/{phase}.csv", [epoch, avg_loss, accuracy, batch_size, lr])
 
         if phase == 'val':

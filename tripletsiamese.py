@@ -36,11 +36,19 @@ class SiameseNetwork(nn.Module):
 
             nn.MaxPool2d(kernel_size=2, stride=2),
 
-            nn.Conv2d(in_channels=512, out_channels=256, kernel_size=3, stride=1, padding=1),
+            # nn.Conv2d(in_channels=512, out_channels=256, kernel_size=3, stride=1, padding=1),
+            # nn.BatchNorm2d(256),
+            # nn.ReLU(inplace=True),
+
+            # nn.Conv2d(in_channels=256, out_channels=128, kernel_size=3, stride=1, padding=1),
+            # nn.BatchNorm2d(128),
+            # nn.ReLU(inplace=True),
+
+            nn.Conv2d(in_channels=512, out_channels=256, kernel_size=1, stride=1),
             nn.BatchNorm2d(256),
             nn.ReLU(inplace=True),
 
-            nn.Conv2d(in_channels=256, out_channels=128, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(in_channels=256, out_channels=128, kernel_size=1, stride=1),
             nn.BatchNorm2d(128),
             nn.ReLU(inplace=True),
 

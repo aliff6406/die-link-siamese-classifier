@@ -8,20 +8,18 @@ import torch.nn.functional as F
 
 import numpy as np
 
-from pytorch_metric_learning import distances, losses, miners
+# from pytorch_metric_learning import distances, losses, miners
 
 # Custom Imports
 import config
-from tensorsiamese import SiameseNetwork
-from losses import ContrastiveLoss
-from online_pair import SiameseTensorPairDataset
-from offline_pair import OfflinePairDataset
+from tripletsiamese import SiameseNetwork
+from datasets import OfflineTripletDataset
 from utils import cur_time, write_csv, init_log, init_run_log, create_if_not_exist, load_losses_accs
 from eval_metrics import evaluate, plot_loss, plot_accuracy, plot_roc
 
 # Global variables
-device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-artifact_path = os.path.join(config.sam_bce_out, cur_time())
+device = torch.device('cuda:2' if torch.cuda.is_available() else 'cpu')
+artifact_path = os.path.join(config.sam_triplet_out, cur_time())
 
 def main():
     os.makedirs(artifact_path)
@@ -30,13 +28,13 @@ def main():
     init_log(f"{artifact_path}/val.csv")
     init_run_log(f"{artifact_path}/hyperparameters.csv")
 
-    train_pairs = config.combined_train
-    val_pairs = config.combined_val
-    tensors = config.combined_tensors
+    train_triplet = config.triplet_combined_train
+    val_triplet = config.triplet_combined_val
+    tensors = config.tensor_data
 
     # HYPERPARAMETERS
     # Linear Scaling of learning rate based on [https://arxiv.org/pdf/1706.02677.pdf]
-    num_epochs = 30
+    num_epochs = 50
     batch_size = 32
     initial_lr = 1e-3
     # weight_decay = 1e-3
@@ -48,12 +46,12 @@ def main():
     
 
     coin_dataset = {
-        'train': OfflinePairDataset(pair_dir=train_pairs, tensor_dir=tensors),
-        'val': OfflinePairDataset(pair_dir=val_pairs, tensor_dir=tensors)
+        'train': OfflineTripletDataset(triplet_dir=train_triplet, tensor_dir=tensors),
+        'val': OfflineTripletDataset(triplet_dir=val_triplet, tensor_dir=tensors)
     }
 
     dataloaders = {
-        x:torch.utils.DataLoader(coin_dataset[x],batch_size=batch_size, shuffle=True if x=='train' else False)
+        x:torch.utils.data.DataLoader(coin_dataset[x],batch_size=batch_size, shuffle=True if x=='train' else False)
         for x in ['train','val']}
     
     model = SiameseNetwork()
@@ -68,7 +66,9 @@ def main():
                                                     optimizer.__class__.__name__, optim_momentum, 
                                                     scheduler.__class__.__name__, criterion.__class__.__name__, 
                                                     scheduler_step_size, scheduler_gamma])
+    
     best_val_loss = 100000000
+
 
     for epoch in range(num_epochs):
         print("Epoch [{}/{}]".format(epoch+1, num_epochs))
@@ -125,17 +125,17 @@ def train_val(model, optimizer, criterion, epoch, dataloaders, scheduler, batch_
                 ap_dist = F.pairwise_distance(anc_emb, pos_emb, p=2)
                 an_dist = F.pairwise_distance(anc_emb, neg_emb, p=2)
 
-                distances.append(ap_dist.cpu().detach().numpy())
-                labels.append(np.ones(ap_dist.size(0)))
+                distances.extend(ap_dist.cpu().detach().numpy().flatten())
+                labels.extend(np.ones(ap_dist.size(0)).flatten())
 
-                distances.append(an_dist.cpu().detach().numpy())
-                labels.append(np.zeros(an_dist.size(0)))
+                distances.extend(an_dist.cpu().detach().numpy().flatten())
+                labels.extend(np.zeros(an_dist.size(0)).flatten())
 
                 loss_sum += loss.item()
 
         avg_loss = loss_sum / len(dataloaders[phase])
-        labels = np.array(labels).flatten()
-        distances = np.array(distances).flatten()
+        labels = np.array(labels)
+        distances = np.array(distances)
 
         tpr, fpr, acc = evaluate(distances, labels)
 
@@ -143,7 +143,7 @@ def train_val(model, optimizer, criterion, epoch, dataloaders, scheduler, batch_
 
         print("{}: Loss = {:.8f} | Accuracy = {:.8f}".format(phase, avg_loss, accuracy))
 
-        lr = '_'.join(map(str, scheduler.get_lr()))
+        lr = '_'.join(map(str, scheduler.get_last_lr()))
         write_csv(f"{artifact_path}/{phase}.csv", [epoch, avg_loss, accuracy, batch_size, lr])
 
         if phase == 'val':

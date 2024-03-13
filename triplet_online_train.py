@@ -12,7 +12,7 @@ from pytorch_metric_learning import distances, losses, miners, reducers
 
 # Custom Imports
 import config
-from tensorsiamese import SiameseNetwork
+from siamese import SiameseNetwork
 from losses import ContrastiveLoss
 from datasets import OnlineTripletDataset, OfflineTripletDataset
 from utils import cur_time, write_csv, init_log, init_run_log, create_if_not_exist, load_losses_accs

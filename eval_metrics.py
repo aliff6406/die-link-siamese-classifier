@@ -4,6 +4,7 @@ from sklearn.model_selection import KFold
 import matplotlib.pyplot as plt
 from sklearn.metrics import auc, confusion_matrix
 
+
 def evaluate_bce(preds, labels):
     preds = np.array(preds).flatten()
     labels = np.array(labels).flatten()
@@ -21,12 +22,36 @@ Used for finding optimal Threshold value for classifying similar / dissimilar pa
 on Siamese Network trained with Contrastive and Triplet Loss
 Code adapted from David Sandberg's FaceNet implementation [https://github.com/davidsandberg/facenet/blob/master/src/lfw.py]
 '''
+def evaluate(distances, labels, step=0.001):
+    min_threshold = min(distances)
+    max_threshold = max(distances)
+    max_acc = 0
+    max_tpr = 0
+    max_fpr = 0
+    issame = (labels == 1)
 
-def evaluate(distances, labels, nrof_folds=10):
-    # Calculate evaluation metrics
-    thresholds = np.arange(0, 5, 0.01)
-    tpr, fpr, accuracy, fp, fn = calculate_roc(thresholds, distances, labels, nrof_folds=nrof_folds)
-    return tpr, fpr, accuracy
+    for threshold in np.arange(min_threshold, max_threshold+step, step):
+        tp = (distances <= threshold) & issame
+        tn = (distances > threshold) & (~issame)
+        tnr = tn.sum().astype(float) / (~issame).sum().astype(float) 
+        fp = (distances <= threshold) & (~issame)
+        fn = (distances > threshold) & issame
+
+        tpr = tp.sum().astype(float) / issame.sum().astype(float)  
+        fpr = fp.sum().astype(float) / (~issame).sum().astype(float)  
+
+        acc = (tp.sum() + tn.sum()).astype(float) / (tp.sum() + tn.sum() + fp.sum() + fn.sum()).astype(float)
+        max_acc = max(acc, max_acc)
+        max_tpr = max(tpr, max_tpr)
+        max_fpr = max(fpr, max_fpr)
+
+    return max_tpr, max_fpr, max_acc
+
+# def evaluate(distances, labels, nrof_folds=10):
+#     # Calculate evaluation metrics
+#     thresholds = np.arange(0, 5, 0.01)
+#     tpr, fpr, accuracy = calculate_roc(thresholds, distances, labels, nrof_folds=nrof_folds)
+#     return tpr, fpr, accuracy
 
 
 def calculate_roc(thresholds, distances, labels, nrof_folds=10):
@@ -58,7 +83,7 @@ def calculate_roc(thresholds, distances, labels, nrof_folds=10):
                                                                                                  distances[test_set], 
                                                                                                  labels[test_set])
         # Use the best threshold to get the accuracy on the test set
-        _, _, accuracy[fold_idx] = calculate_accuracy(threshold[best_threshold_index],
+        _, _, accuracy[fold_idx] = calculate_accuracy(thresholds[best_threshold_index],
                                                       distances[test_set],
                                                       labels[test_set])
         tpr = np.mean(tprs, 0)

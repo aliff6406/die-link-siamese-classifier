@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, roc_curve, auc, confusion_matrix
 
 import tripletsiamese
-import tensorsiamese
+import siamese
 from offline_pair import OfflinePairDataset
 from eval_metrics import evaluate, plot_roc
 
@@ -19,7 +19,7 @@ def eval_bce():
     test_pairs = config.obverse_test
     obverse_tensors = config.obverse_tensors
 
-    model = tensorsiamese.SiameseNetwork()
+    model = siamese.SiameseNetwork()
     model.to('cuda')
 
     checkpoint_path = 'runs/bce-fix-val/best.pt'

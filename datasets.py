@@ -1,8 +1,10 @@
 import os
 
+from PIL import Image
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
+from torchvision import transforms
 
 class OfflinePairDataset(Dataset):
     def __init__(self, pair_dir, tensor_dir, shuffle_pairs=True):
@@ -62,3 +64,33 @@ class OnlineTripletDataset(Dataset):
         tensor = torch.load(tensor_path, map_location='cpu').squeeze()
 
         return tensor, label
+
+class OfflineImagePairDataset(Dataset):
+    def __init__(self, pair_dir, img_dir, transform=None):
+        self.pair_df = pd.read_csv(pair_dir, header=None)
+        self.img_dir = img_dir
+
+        if transform is not None:
+            if transform == "resnet50":
+                # Apply normalization for Resnet50
+                self.transform = transforms.Compose([
+                    transforms.ToTensor(),
+                    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            ])
+                
+    def __len__(self):
+        return len(self.pair_df)
+    
+    def __getitem__(self, idx):
+        img1_path = os.path.join(self.img_dir, self.pair_df.iloc[idx, 0])
+        img2_path = os.path.join(self.img_dir, self.pair_df.iloc[idx, 1])
+        label = self.pair_df.iloc[idx, 2]
+
+        img1 = Image.open(img1_path).convert("RGB")
+        img2 = Image.open(img2_path).convert("RGB")
+
+        if self.transform:
+            img1 = self.transform(img1).float()
+            img2 = self.transform(img2).float()
+
+        return img1, img2, torch.tensor(label, dtype=torch.float32)
