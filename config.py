@@ -54,3 +54,6 @@ efficientnet_bce_out = 'runs/efficientnet/bce'
 
 # MobileNet_v2
 mobilenetv2_bce_out = 'runs/mobilenetv2/bce'
+
+# DenseNet-121
+densenet_bce_out = 'runs/densenet/bce'

@@ -26,23 +26,22 @@ class SiameseNetwork(nn.Module):
                 self.backbone = nn.Sequential(*list(resnet50.children())[:-2])
                 for param in self.backbone.parameters():
                     param.requires_grad = False
-                # Unfreeze layers in Sequential(7) -> Bottleneck(2)
-                # for param in self.backbone[7][2].parameters():
-                #     param.requires_grad = True
                 emb_num_features = 128 * 7 * 7
+                feature_map_size = 512
 
             elif backbone == "vgg16":
                 print("Training with VGG16 backbone")
                 # VGG16 with batch normalization pretrained on ImageNet1k v1
                 # Number of trainable parameters: 7082496
-                vgg16_bn = models.vgg16_bn(weights=models.VGG16_BN_Weights.IMAGENET1K_V1)
-                self.backbone = nn.Sequential(*list(vgg16_bn.children())[:-2])
+                vgg16 = models.vgg16(weights=models.VGG16_Weights.IMAGENET1K_V1)
+                self.backbone = nn.Sequential(*list(vgg16.children())[:-2])
                 for param in self.backbone.parameters():
                     param.requires_grad = False
                 # # Unfreeze layers in Sequential(0) from layer (34) to end
                 # for param in self.backbone[0][34].parameters():
                 #     param.requires_grad = True
                 emb_num_features = 128 * 7 * 7
+                feature_map_size = 512
 
             elif backbone == "alexnet":
                 print("Training with AlexNet backbone")
@@ -53,7 +52,8 @@ class SiameseNetwork(nn.Module):
                 # Freeze all AlexNet layers
                 for param in self.backbone.parameters():
                     param.requires_grad = True
-                emb_num_features = 256 * 6 * 6
+                emb_num_features = 128 * 6 * 6
+                feature_map_size = 256
             
             elif backbone == "efficientnet":
                 print("Training with EfficientNet_b0 backbone")
@@ -64,8 +64,23 @@ class SiameseNetwork(nn.Module):
                 for param in self.backbone.parameters():
                     param.requires_grad = False
                 emb_num_features = 128 * 7 * 7
-                pass
-            
+                feature_map_size = 512
+
+            elif backbone == "densenet121":
+                print("Training with DenseNet-121 backbone")
+                # DenseNet121 pretrained on ImageNet1k v1
+                densenet = models.densenet121(weights=models.DenseNet121_Weights.IMAGENET1K_V1)
+                self.backbone = nn.Sequential(*list(densenet.children())[:-1])
+                for param in self.backbone.parameters():
+                    param.requires_grad = False
+                emb_num_features = 128 * 7 * 7
+                feature_map_size = 512
+
+            elif backbone == "squeezenet1_1":
+                print("Training with SqueezeNet1_1 backbone")
+                # SqueezeNet1_1 pretrained on ImageNet1k v1
+                squeezenet = models.squeezenet1_1(weights=models.SqueezeNet1_1_Weights.IMAGENET1K_V1)
+
             elif backbone == "mobilenet_v2":
                 print("Training with MobileNet_v2 backbone")
                 # MobileNet pretrained on ImageNet1k v1
@@ -74,26 +89,24 @@ class SiameseNetwork(nn.Module):
                 for param in self.backbone.parameters():
                     param.requires_grad = False
                 emb_num_features = 128 * 7 * 7
+
+
         # Reduce number of feature maps using 1x1 convolutions
         self.downsample_resnet50 = nn.Sequential(
-            nn.Conv2d(in_channels=2048, out_channels=256, kernel_size=1, stride=1)
-        )
-
-        self.downsample_vgg16 = nn.Sequential(
-            nn.Conv2d(in_channels=512, out_channels=256, kernel_size=1, stride=1)
-        )
-
-        self.flatten_alexnet = nn.Sequential(
-            nn.Flatten(start_dim=1)
+            nn.Conv2d(in_channels=2048, out_channels=512, kernel_size=1, stride=1)
         )
 
         self.downsample_efficientnetb0 = nn.Sequential(
-            nn.Conv2d(in_channels=1280, out_channels=256, kernel_size=1, stride=1)
+            nn.Conv2d(in_channels=1280, out_channels=512, kernel_size=1, stride=1)
+        )
+
+        self.downsample_densenet121 = nn.Sequential(
+            nn.Conv2d(in_channels=1024, out_channels=512, kernel_size=1, stride=1)
         )
 
         # Convolutional layers for other pre-trained models
-        self.backbone_conv_layers = nn.Sequential(
-            nn.Conv2d(in_channels=256, out_channels=512, kernel_size=3, stride=1, padding=1),
+        self.stacked_conv = nn.Sequential(
+            nn.Conv2d(in_channels=feature_map_size, out_channels=512, kernel_size=3, stride=1, padding=1),
             nn.BatchNorm2d(512),
             nn.ReLU(inplace=True),
 
@@ -167,18 +180,20 @@ class SiameseNetwork(nn.Module):
             emb = self.backbone(input)
             if self.backbone_name == "resnet50":
                 out = self.downsample_resnet50(emb)
-                output = self.backbone_conv_layers(out)
+                output = self.stacked_conv(out)
             elif self.backbone_name == "vgg16":
-                out = self.downsample_vgg16(emb)
-                output = self.backbone_conv_layers(out)
+                output = self.stacked_conv(emb)
             elif self.backbone_name == "alexnet":
-                output = self.flatten_alexnet(emb)
+                output = self.stacked_conv(emb)
             elif self.backbone_name == "efficientnet":
                 out = self.downsample_efficientnetb0(emb)
-                output = self.backbone_conv_layers(out)
+                output = self.stacked_conv(out)
+            elif self.backbone_name == "densenet121":
+                out = self.downsample_densenet121(emb)
+                output = self.stacked_conv(out)
             elif self.backbone_name == "mobilenet_v2":
                 out = self.downsample_efficientnetb0(emb)
-                output = self.backbone_conv_layers(out)
+                output = self.stacked_conv(out)
         else:
             output = self.conv_layers(input)
         return output

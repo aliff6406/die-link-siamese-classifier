@@ -13,8 +13,8 @@ from utils import cur_time, write_csv, init_log, init_run_log, create_if_not_exi
 from eval_metrics import evaluate_bce, evaluate, plot_loss, plot_accuracy, plot_roc
 
 # Global variables
-device = torch.device('cuda:7' if torch.cuda.is_available() else 'cpu')
-artifact_path = os.path.join(config.vgg_bce_out, cur_time())
+device = torch.device('cuda:3' if torch.cuda.is_available() else 'cpu')
+artifact_path = os.path.join(config.densenet_bce_out, cur_time())
 
 def main():
     os.makedirs(artifact_path)
@@ -49,11 +49,11 @@ def main():
         x:torch.utils.data.DataLoader(coin_dataset[x],batch_size=batch_size, shuffle=True if x=='train' else False)
         for x in ['train','val']}
     
-    model = SiameseNetwork(backbone='vgg16')
+    model = SiameseNetwork(backbone='densenet121')
     model.to(device)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=initial_lr)
-    # optimizer = torch.optim.SGD(model.parameters(), lr=initial_lr, momentum=optim_momentum)
+    # optimizer = torch.optim.Adam(model.parameters(), lr=initial_lr)
+    optimizer = torch.optim.SGD(model.parameters(), lr=initial_lr, momentum=optim_momentum)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=scheduler_step_size, gamma=scheduler_gamma)
     criterion = nn.BCELoss()
 
