@@ -76,21 +76,6 @@ class SiameseNetwork(nn.Module):
                 emb_num_features = 128 * 7 * 7
                 feature_map_size = 512
 
-            elif backbone == "squeezenet1_1":
-                print("Training with SqueezeNet1_1 backbone")
-                # SqueezeNet1_1 pretrained on ImageNet1k v1
-                squeezenet = models.squeezenet1_1(weights=models.SqueezeNet1_1_Weights.IMAGENET1K_V1)
-
-            elif backbone == "mobilenet_v2":
-                print("Training with MobileNet_v2 backbone")
-                # MobileNet pretrained on ImageNet1k v1
-                mobilenet = models.mobilenet_v2(weights=models.MobileNet_V2_Weights.IMAGENET1K_V1)
-                self.backbone = nn.Sequential(*list(mobilenet.children())[:-1])
-                for param in self.backbone.parameters():
-                    param.requires_grad = False
-                emb_num_features = 128 * 7 * 7
-
-
         # Reduce number of feature maps using 1x1 convolutions
         self.downsample_resnet50 = nn.Sequential(
             nn.Conv2d(in_channels=2048, out_channels=512, kernel_size=1, stride=1)
