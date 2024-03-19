@@ -15,7 +15,7 @@ from eval_metrics import evaluate, plot_roc
 
 import config
 
-def eval_bce():
+def evaluate():
     test_pairs = config.obverse_test
     obverse_tensors = config.obverse_tensors
 
@@ -29,7 +29,7 @@ def eval_bce():
     print("epoch: ", checkpoint['epoch'])
 
     test_dataset = OfflinePairDataset(pair_dir=test_pairs, tensor_dir=obverse_tensors)
-    test_loader = DataLoader(test_dataset, batch_size=128, shuffle=False)
+    test_loader = DataLoader(test_dataset, shuffle=False)
 
     # Lists to store predictions and labels
     all_preds = []
@@ -37,7 +37,7 @@ def eval_bce():
 
     model.eval()
     with torch.no_grad():
-        for (tensor1, tensor2), label in test_loader:
+        for tensor1, tensor2, label, tensor1_name, tensor2_name in test_loader:
             tensor1, tensor2, label = map(lambda x: x.to('cuda'), [tensor1, tensor2, label])
             label = label.view(-1)
 

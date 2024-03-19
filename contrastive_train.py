@@ -10,7 +10,7 @@ import numpy as np
 
 # Custom Imports
 import config
-from siamese import SiameseNetwork
+from samsiamese import SiameseNetwork
 from losses import ContrastiveLoss
 from datasets import OfflinePairDataset
 from utils import cur_time, write_csv, init_log, init_run_log, create_if_not_exist, load_losses_accs
@@ -130,7 +130,7 @@ def train_val(model, optimizer, criterion, epoch, dataloaders, scheduler, batch_
         labels = np.array(labels).flatten()
         distances = np.array(distances).flatten()
 
-        tpr, fpr, acc = evaluate(distances, labels)
+        tpr, fpr, acc, threshold = evaluate(distances, labels)
 
         accuracy = np.mean(acc)
 

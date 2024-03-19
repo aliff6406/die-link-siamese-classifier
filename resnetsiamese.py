@@ -11,12 +11,12 @@ class SiameseNetwork(nn.Module):
                  ):
         super().__init__()
         self.contrastive_loss = contrastive_loss
-        # Placeholder for variable feature_map_size for stacked_conv layers
-        self.feature_map_size = 512
         # Default embedding number of features for SAM backbone
         emb_num_features = 128 * 8 * 8
 
-
+        # Placeholder for variable feature_map_size for stacked_conv layers
+        self.feature_map_size = 512
+        print(self.feature_map_size)
         if backbone is not None:
             self.backbone_name = backbone
             if backbone not in models.__dict__:
@@ -93,7 +93,7 @@ class SiameseNetwork(nn.Module):
         )
 
         # Convolutional layers for other pre-trained models
-        self.stacked_conv = nn.Sequential(
+        self.backbone_conv_layers = nn.Sequential(
             nn.Conv2d(in_channels=self.feature_map_size, out_channels=512, kernel_size=3, stride=1, padding=1),
             nn.BatchNorm2d(512),
             nn.ReLU(inplace=True),
@@ -168,7 +168,7 @@ class SiameseNetwork(nn.Module):
             emb = self.backbone(input)
             if self.backbone_name == "resnet50":
                 out = self.downsample_resnet50(emb)
-                output = self.stacked_conv(out)
+                output = self.backbone_conv_layers(out)
             elif self.backbone_name == "vgg16":
                 output = self.stacked_conv(emb)
             elif self.backbone_name == "alexnet":
