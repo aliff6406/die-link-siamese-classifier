@@ -130,7 +130,7 @@ def train_val(model, optimizer, criterion, epoch, dataloaders, scheduler, batch_
         labels = np.array(labels).flatten()
         distances = np.array(distances).flatten()
 
-        tpr, fpr, acc = evaluate(distances, labels)
+        tpr, fpr, acc, threshold = evaluate(distances, labels)
 
         accuracy = np.mean(acc)
 

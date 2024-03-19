@@ -30,6 +30,12 @@ def init_log_header(path):
     with open(path, 'w') as f:
         f.write('epoch,loss,acc,bs,lr\n')
 
+def init_evaluate_log(path):
+    create_if_not_exist(path)
+    with open(path, 'w') as f:
+        f.write('accuracy,precision,recall,f1score,auc,fpr,TPR,FPR\n')
+
+
 def write_csv(file, newrow):
     with open(file, mode='a') as f:
         writer = csv.writer(f, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
