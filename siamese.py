@@ -11,12 +11,12 @@ class SiameseNetwork(nn.Module):
                  ):
         super().__init__()
         self.contrastive_loss = contrastive_loss
+        # Placeholder for variable feature_map_size for stacked_conv layers
+        self.feature_map_size = 512
         # Default embedding number of features for SAM backbone
         emb_num_features = 128 * 8 * 8
 
-        # Placeholder for variable feature_map_size for stacked_conv layers
-        self.feature_map_size = 512
-        print(self.feature_map_size)
+
         if backbone is not None:
             self.backbone_name = backbone
             if backbone not in models.__dict__:

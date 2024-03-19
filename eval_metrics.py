@@ -42,13 +42,16 @@ def evaluate(distances, labels, step=0.001):
 
         acc = (tp.sum() + tn.sum()).astype(float) / (tp.sum() + tn.sum() + fp.sum() + fn.sum()).astype(float)
 
+        # max_acc = max(acc, max_acc)
+        # max_tpr = max(tpr, max_tpr)
+        # max_fpr = max(fpr, max_fpr)
         if acc > max_acc:
             max_acc = acc
             best_threshold = threshold
             max_tpr = tpr
             max_fpr = fpr
 
-    return max_tpr, max_fpr, max_acc, best_threshold
+    return max_tpr, max_fpr, max_acc, threshold
 
 def final_evaluate(distances, labels, threshold):
     issame = (labels == 1)

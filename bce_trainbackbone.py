@@ -14,7 +14,7 @@ from eval_metrics import evaluate_bce, evaluate, plot_loss, plot_accuracy, plot_
 
 # Global variables
 device = torch.device('cuda:3' if torch.cuda.is_available() else 'cpu')
-artifact_path = os.path.join(config.densenet_bce_out, cur_time())
+artifact_path = os.path.join(config.vgg_bce_out, cur_time())
 
 def main():
     os.makedirs(artifact_path)
@@ -49,7 +49,7 @@ def main():
         x:torch.utils.data.DataLoader(coin_dataset[x],batch_size=batch_size, shuffle=True if x=='train' else False)
         for x in ['train','val']}
     
-    model = SiameseNetwork(backbone='densenet121')
+    model = SiameseNetwork(backbone='vgg16')
     model.to(device)
 
     # optimizer = torch.optim.Adam(model.parameters(), lr=initial_lr)
