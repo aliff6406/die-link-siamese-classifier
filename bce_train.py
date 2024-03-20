@@ -7,7 +7,7 @@ import torch.nn as nn
 
 # Custom Imports
 import config
-from siamese import SiameseNetwork
+from samsiamese import SiameseNetwork
 from datasets import OfflinePairDataset
 from utils import cur_time, write_csv, init_log, init_run_log, create_if_not_exist, load_losses_accs
 from eval_metrics import evaluate_bce, evaluate, plot_loss, plot_accuracy, plot_roc
@@ -30,7 +30,7 @@ def main():
     # HYPERPARAMETERS
     # Linear Scaling of learning rate based on [https://arxiv.org/pdf/1706.02677.pdf]
     num_epochs = 50
-    batch_size = 32
+    batch_size = 128
     initial_lr = 1e-3
     # weight_decay = 1e-5
     weight_decay = "x"
