@@ -35,7 +35,11 @@ def init_evaluate_log(path):
     with open(path, 'w') as f:
         f.write('accuracy,precision,recall,f1score,auc,fpr,TPR,FPR\n')
 
-
+def init_problematic_coin_log(path):
+    create_if_not_exist(path)
+    with open(path, 'w') as f:
+        f.write('coin1,coin2,prediction\n')
+        
 def write_csv(file, newrow):
     with open(file, mode='a') as f:
         writer = csv.writer(f, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)

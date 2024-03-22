@@ -113,7 +113,7 @@ class EvaluatePairDataset(Dataset):
         tensor2 = torch.load(tensor2_path, map_location='cpu').squeeze()
 
         tensor1_name = os.path.splitext(self.pair_df.iloc[idx, 0])[0]
-        tensor2_name = os.path.splitext(self.pair_df.iloc[idx, 0])[0]
+        tensor2_name = os.path.splitext(self.pair_df.iloc[idx, 1])[0]
         return tensor1, tensor2, torch.tensor(label, dtype=torch.float32), tensor1_name, tensor2_name
 
 class EvaluateImagePairDataset(Dataset):
@@ -140,7 +140,7 @@ class EvaluateImagePairDataset(Dataset):
         img1 = Image.open(img1_path).convert("RGB")
         img2 = Image.open(img2_path).convert("RGB")
         coin1 = os.path.splitext(self.pair_df.iloc[idx, 0])[0]
-        coin2 = os.path.splitext(self.pair_df.iloc[idx, 0])[0]
+        coin2 = os.path.splitext(self.pair_df.iloc[idx, 1])[0]
         
         if self.transform:
             img1 = self.transform(img1).float()
