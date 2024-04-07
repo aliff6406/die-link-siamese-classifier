@@ -1,4 +1,4 @@
-# die_link_classifier
+# Ancient Coin Die Link Classifier
 ==============================
 
 A complete machine learning pipeline to classify die links between ancient coins.
@@ -8,3 +8,4 @@ A complete machine learning pipeline to classify die links between ancient coins
 | Requirements | Description  |
 | ------------ | ------------ |
 | Python       | Version > 3.8 |
+
