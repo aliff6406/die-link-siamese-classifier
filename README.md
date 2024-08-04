@@ -16,10 +16,7 @@ This project uses Segment Anything Model's base vision transformer image encoder
 1. CD into the project folder and run the non-excutable local_setup.sh script to set up the virtual environment
 
    ```s
-   python3 -m venv .venv
-   source .venv/bin/activate
-   pip install --upgrade pip
-   pip install -r local_requirements.txt
+   sh local_setup.sh
    ```
 
 ### Note on Training/Testing your own Custom Dataset
